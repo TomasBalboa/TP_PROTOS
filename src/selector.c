@@ -14,7 +14,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
-#include <sys/signal.h>
+#include <sys/signal.h> // signal constants and types
+#include <signal.h>     // sigaction, sigemptyset, sigaddset, sigprocmask
 #include "selector.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))

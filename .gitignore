@@ -1,0 +1,48 @@
+# Archivos objeto
+*.o
+
+# Ejecutables
+socks5d
+socks5-admin
+run_tests
+
+# Tests individuales
+test-buffer
+test-selector
+test-stm
+test-netutils
+test-parser
+
+# Directorios de build (por si se usan en el futuro)
+build/
+bin/
+
+# Archivos de log
+*.log
+
+# Archivos temporales
+*~
+*.tmp
+*.swp
+*.swo
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Core dumps
+core
+core.*
+
+# Valgrind output
+vgcore.*
+*.valgrind
+
+# IDE files
+.vscode/
+*.sublime-*
+.idea/
+
+# Backup files
+*.bak
+*.backup
