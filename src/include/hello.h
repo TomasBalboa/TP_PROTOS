@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "socks5nio.h"
 #include "buffer.h"
 
 /**

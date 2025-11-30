@@ -23,7 +23,6 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-#include "socks5.h"
 #include "selector.h"
 #include "socks5nio.h"
 

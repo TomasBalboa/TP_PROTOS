@@ -2,7 +2,6 @@
  * hello.c - Implementación del parser de handshake SOCKS5
  */
 #include "hello.h"
-#include "socks5.h"
 #include <string.h>
 
 void hello_parser_init(struct hello_parser *p) {
