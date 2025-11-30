@@ -1,26 +1,27 @@
 /**
  * socks5nio.c  - controla el flujo de un proxy SOCKSv5 (sockets no bloqueantes)
  */
-#include<stdio.h>
-#include <stdlib.h>  // malloc
-#include <string.h>  // memset
-#include <assert.h>  // assert
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 #include <errno.h>
-#include <time.h>
-#include <unistd.h>  // close
-#include <pthread.h>
-
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 
+#include "socks5nio.h"
 #include "hello.h"
 #include "request.h"
 #include "buffer.h"
-
 #include "stm.h"
-#include "socks5nio.h"
-#include"netutils.h"
+#include "netutils.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
+
+// Tamaño de buffers
+#define BUFFER_SIZE 4096
 
 
 /** maquina de estados general */
@@ -51,7 +52,68 @@ enum socks_v5state {
      */
     HELLO_WRITE,
 
-…
+    /**
+     * Lee el request del cliente
+     *
+     * Intereses:
+     *     - OP_READ sobre client_fd
+     *
+     * Transiciones:
+     *   - REQUEST_READ    mientras el mensaje no esté completo
+     *   - REQUEST_RESOLVING cuando está completo y necesita DNS
+     *   - REQUEST_CONNECTING cuando está completo y puede conectar
+     *   - ERROR           ante cualquier error
+     */
+    REQUEST_READ,
+
+    /**
+     * Resuelve de forma asíncrona el nombre de dominio
+     *
+     * Intereses:
+     *     - OP_NOOP
+     *
+     * Transiciones:
+     *   - REQUEST_CONNECTING cuando se resolvió el dominio
+     *   - ERROR              si no se pudo resolver
+     */
+    REQUEST_RESOLVING,
+
+    /**
+     * Intenta conectar al origin server
+     *
+     * Intereses:
+     *     - OP_WRITE sobre origin_fd
+     *
+     * Transiciones:
+     *   - REQUEST_WRITE      cuando se conectó exitosamente
+     *   - ERROR              si no se pudo conectar
+     */
+    REQUEST_CONNECTING,
+
+    /**
+     * Envía la respuesta del request al cliente
+     *
+     * Intereses:
+     *     - OP_WRITE sobre client_fd
+     *
+     * Transiciones:
+     *   - REQUEST_WRITE mientras queden bytes por enviar
+     *   - COPY          cuando se enviaron todos los bytes
+     *   - ERROR         ante cualquier error
+     */
+    REQUEST_WRITE,
+
+    /**
+     * Copia bytes entre client_fd y origin_fd
+     *
+     * Intereses:
+     *     - OP_READ | OP_WRITE sobre ambos fds según corresponda
+     *
+     * Transiciones:
+     *   - COPY  mientras hay datos para copiar
+     *   - DONE  cuando se terminó la copia
+     */
+    COPY,
 
     // estados terminales
     DONE,
@@ -70,7 +132,42 @@ struct hello_st {
     uint8_t               method;
 } ;
 
-…
+/** usado por REQUEST_READ, REQUEST_RESOLVING, REQUEST_CONNECTING, REQUEST_WRITE */
+struct request_st {
+    /** buffer utilizado para I/O */
+    buffer                 *rb, *wb;
+    struct request_parser   parser;
+    
+    /** tipo de dirección a la que nos queremos conectar */
+    enum socks5_addr_type   addr_type;
+    
+    /** información de la conexión */
+    union {
+        char            fqdn[MAX_DOMAIN_LEN];
+        struct sockaddr_storage storage;
+    } dest_addr;
+    
+    /** puerto de destino */
+    uint16_t                dest_port;
+    
+    /** respuesta al cliente */
+    enum socks5_reply       reply;
+};
+
+/** usado por REQUEST_CONNECTING */
+struct connecting {
+    /** dirección a la que nos intentamos conectar */
+    struct addrinfo *current_addr;
+};
+
+/** usado por COPY */
+struct copy {
+    /** buffers para cada dirección */
+    int    *fd;
+    buffer *rb, *wb;
+    /** intereses en el selector para cada fd */
+    fd_interest duplex;
+};
 
 /*
  * Si bien cada estado tiene su propio struct que le da un alcance
@@ -81,23 +178,90 @@ struct hello_st {
  * liberarlo finalmente, y un pool para reusar alocaciones previas.
  */
 struct socks5 {
-…
+    /** información del cliente */
+    struct sockaddr_storage client_addr;
+    socklen_t               client_addr_len;
+    
+    /** file descriptors */
+    int                     client_fd;
+    int                     origin_fd;
+    
+    /** resolución de DNS */
+    struct addrinfo        *origin_resolution;
+    struct addrinfo        *origin_resolution_current;
+    
     /** maquinas de estados */
-    struct state_machine          stm;
+    struct state_machine    stm;
+    
+    /** buffers para lectura y escritura */
+    uint8_t                 raw_buff_a[BUFFER_SIZE], raw_buff_b[BUFFER_SIZE];
+    buffer                  read_buffer, write_buffer;
+    
+    /** cantidad de referencias a este objeto */
+    unsigned                references;
+    
+    /** siguiente en el pool */
+    struct socks5          *next;
 
     /** estados para el client_fd */
     union {
-        struct hello_st           hello;
-        struct request_st         request;
-        struct copy               copy;
+        struct hello_st     hello;
+        struct request_st   request;
+        struct copy         copy;
     } client;
     /** estados para el origin_fd */
     union {
-        struct connecting         conn;
-        struct copy               copy;
+        struct connecting   conn;
+        struct copy         copy;
     } orig;
-…
 };
+
+////////////////////////////////////////////////////////////////////
+// Pool de objetos socks5
+
+/** pool de objetos socks5 */
+static struct socks5 *pool = NULL;
+static unsigned       pool_size = 0;
+static const unsigned max_pool  = 50;
+
+/** Forward declaration de la tabla de estados */
+static const struct state_definition client_statbl[];
+
+/** crea un nuevo objeto socks5 */
+static struct socks5 *
+socks5_new(int client_fd) {
+    struct socks5 *ret;
+
+    if (pool == NULL) {
+        ret = malloc(sizeof(*ret));
+    } else {
+        ret       = pool;
+        pool      = pool->next;
+        ret->next = NULL;
+        pool_size--;
+    }
+
+    if (ret == NULL) {
+        return NULL;
+    }
+
+    memset(ret, 0, sizeof(*ret));
+
+    ret->client_fd           = client_fd;
+    ret->origin_fd           = -1;
+    ret->origin_resolution   = NULL;
+    ret->references          = 1;
+
+    buffer_init(&ret->read_buffer,  N(ret->raw_buff_a), ret->raw_buff_a);
+    buffer_init(&ret->write_buffer, N(ret->raw_buff_b), ret->raw_buff_b);
+
+    ret->stm.initial   = HELLO_READ;
+    ret->stm.max_state = ERROR;
+    ret->stm.states    = client_statbl;
+    stm_init(&ret->stm);
+
+    return ret;
+}
 
 
 /** realmente destruye */
@@ -200,26 +364,16 @@ fail:
 // HELLO
 ////////////////////////////////////////////////////////////////////////////////
 
-/** callback del parser utilizado en `read_hello' */
-static void
-on_hello_method(struct hello_parser *p, const uint8_t method) {
-    uint8_t *selected  = p->data;
-
-    if(SOCKS_HELLO_NOAUTHENTICATION_REQUIRED == method) {
-       *selected = method;
-    }
-}
-
 /** inicializa las variables de los estados HELLO_… */
 static void
 hello_read_init(const unsigned state, struct selector_key *key) {
     struct hello_st *d = &ATTACHMENT(key)->client.hello;
+    (void)state;
 
-    d->rb                              = &(ATTACHMENT(key)->read_buffer);
-    d->wb                              = &(ATTACHMENT(key)->write_buffer);
-    d->parser.data                     = &d->method;
-    d->parser.on_authentication_method = on_hello_method, hello_parser_init(
-            &d->parser);
+    d->rb     = &(ATTACHMENT(key)->read_buffer);
+    d->wb     = &(ATTACHMENT(key)->write_buffer);
+    d->method = SOCKS5_AUTH_NO_ACCEPTABLE;
+    hello_parser_init(&d->parser);
 }
 
 static unsigned
@@ -259,15 +413,272 @@ static unsigned
 hello_process(const struct hello_st* d) {
     unsigned ret = HELLO_WRITE;
 
-    uint8_t m = d->method;
-    const uint8_t r = (m == SOCKS_HELLO_NO_ACCEPTABLE_METHODS) ? 0xFF : 0x00;
-    if (-1 == hello_marshall(d->wb, r)) {
-        ret  = ERROR;
+    // Seleccionamos el método (por ahora solo NO_AUTH)
+    uint8_t method = SOCKS5_AUTH_NO_AUTH;
+    
+    // Verificamos si el cliente soporta NO_AUTH
+    bool found = false;
+    for (uint8_t i = 0; i < d->parser.nmethods; i++) {
+        if (d->parser.methods[i] == SOCKS5_AUTH_NO_AUTH) {
+            found = true;
+            break;
+        }
     }
-    if (SOCKS_HELLO_NO_ACCEPTABLE_METHODS == m) {
-        ret  = ERROR;
+    
+    if (!found) {
+        method = SOCKS5_AUTH_NO_ACCEPTABLE;
+        ret = ERROR;
     }
+    
+    if (-1 == hello_marshall(d->wb, method)) {
+        ret = ERROR;
+    }
+    
     return ret;
+}
+
+/** libera recursos de hello */
+static void
+hello_read_close(const unsigned state, struct selector_key *key) {
+    struct hello_st *d = &ATTACHMENT(key)->client.hello;
+    (void)state;
+    hello_parser_close(&d->parser);
+}
+
+/** escribe la respuesta del hello */
+static unsigned
+hello_write(struct selector_key *key) {
+    struct hello_st *d = &ATTACHMENT(key)->client.hello;
+    unsigned  ret      = HELLO_WRITE;
+     uint8_t *ptr;
+      size_t  count;
+     ssize_t  n;
+
+    ptr = buffer_read_ptr(d->wb, &count);
+    n = send(key->fd, ptr, count, MSG_NOSIGNAL);
+    if(n == -1) {
+        ret = ERROR;
+    } else {
+        buffer_read_adv(d->wb, n);
+        if(!buffer_can_read(d->wb)) {
+            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
+                ret = REQUEST_READ;
+            } else {
+                ret = ERROR;
+            }
+        }
+    }
+
+    return ret;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// REQUEST
+////////////////////////////////////////////////////////////////////////////////
+
+/** inicializa las variables de los estados REQUEST_… */
+static void
+request_init(const unsigned state, struct selector_key *key) {
+    struct request_st *d = &ATTACHMENT(key)->client.request;
+    (void)state;
+
+    d->rb     = &(ATTACHMENT(key)->read_buffer);
+    d->wb     = &(ATTACHMENT(key)->write_buffer);
+    request_parser_init(&d->parser);
+}
+
+/** libera recursos de request */
+static void
+request_close(const unsigned state, struct selector_key *key) {
+    struct request_st *d = &ATTACHMENT(key)->client.request;
+    (void)state;
+    request_parser_close(&d->parser);
+}
+
+/** Inicializa el estado de conexión al origin */
+static void
+request_connecting_init(const unsigned state, struct selector_key *key) {
+    (void)state;
+    struct request_st *d = &ATTACHMENT(key)->client.request;
+    struct request_parser *p = &d->parser;
+    struct socks5 *s = ATTACHMENT(key);
+    
+    // Resolver dirección
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = 0;
+    hints.ai_protocol = 0;
+    
+    char port_str[6];
+    snprintf(port_str, sizeof(port_str), "%d", p->port);
+    
+    int ret;
+    if(p->atyp == SOCKS5_ADDR_TYPE_IPV4) {
+        char addr_str[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &p->dest.ipv4, addr_str, sizeof(addr_str));
+        ret = getaddrinfo(addr_str, port_str, &hints, &s->origin_resolution);
+    } else if(p->atyp == SOCKS5_ADDR_TYPE_DOMAIN) {
+        ret = getaddrinfo(p->dest.domain.name, port_str, &hints, &s->origin_resolution);
+    } else {
+        // IPv6 no implementado aún
+        ret = -1;
+    }
+    
+    if(ret != 0) {
+        // Error de resolución
+        s->origin_resolution = NULL;
+        d->reply = SOCKS5_REPLY_HOST_UNREACHABLE;
+    }
+    
+    s->origin_resolution_current = s->origin_resolution;
+}
+
+/** Intenta conectar al origin server */
+static unsigned
+request_connecting(struct selector_key *key) {
+    struct request_st *d = &ATTACHMENT(key)->client.request;
+    struct socks5 *s = ATTACHMENT(key);
+    
+    if(s->origin_resolution == NULL) {
+        // No se pudo resolver
+        d->reply = SOCKS5_REPLY_HOST_UNREACHABLE;
+        goto write_response;
+    }
+    
+    // Intentar conectar
+    while(s->origin_resolution_current != NULL) {
+        int origin_fd = socket(s->origin_resolution_current->ai_family,
+                               s->origin_resolution_current->ai_socktype,
+                               s->origin_resolution_current->ai_protocol);
+        
+        if(origin_fd < 0) {
+            s->origin_resolution_current = s->origin_resolution_current->ai_next;
+            continue;
+        }
+        
+        // Modo no bloqueante
+        if(selector_fd_set_nio(origin_fd) == -1) {
+            close(origin_fd);
+            s->origin_resolution_current = s->origin_resolution_current->ai_next;
+            continue;
+        }
+        
+        // Conectar
+        int ret = connect(origin_fd, s->origin_resolution_current->ai_addr,
+                          s->origin_resolution_current->ai_addrlen);
+        
+        if(ret == 0 || (ret == -1 && errno == EINPROGRESS)) {
+            // Conexión exitosa o en progreso
+            s->origin_fd = origin_fd;
+            d->reply = SOCKS5_REPLY_SUCCESS;
+            goto write_response;
+        }
+        
+        close(origin_fd);
+        s->origin_resolution_current = s->origin_resolution_current->ai_next;
+    }
+    
+    // Todas las conexiones fallaron
+    d->reply = SOCKS5_REPLY_HOST_UNREACHABLE;
+
+write_response:
+    {
+        // Preparar respuesta
+        struct in_addr bind_addr;
+        bind_addr.s_addr = INADDR_ANY;
+        
+        size_t  nbytes;
+        uint8_t *ptr = buffer_write_ptr(d->wb, &nbytes);
+        
+        int written = request_write_response(ptr, d->reply, &bind_addr, 0);
+        buffer_write_adv(d->wb, written);
+        
+        if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
+            return REQUEST_WRITE;
+        }
+        return ERROR;
+    }
+}
+
+/** Lee el request del cliente */
+static unsigned
+request_read(struct selector_key *key) {
+    struct request_st *d = &ATTACHMENT(key)->client.request;
+    unsigned  ret      = REQUEST_READ;
+    bool      error    = false;
+    uint8_t  *ptr;
+    size_t    count;
+    ssize_t   n;
+
+    ptr = buffer_write_ptr(d->rb, &count);
+    n = recv(key->fd, ptr, count, 0);
+    
+    if(n > 0) {
+        buffer_write_adv(d->rb, n);
+        const enum request_state st = request_consume(d->rb, &d->parser, &error);
+        
+        if(request_is_done(st)) {
+            // Request completo, pasar a conectar
+            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_NOOP)) {
+                ret = REQUEST_CONNECTING;
+            } else {
+                ret = ERROR;
+            }
+        }
+    } else {
+        ret = ERROR;
+    }
+
+    return error ? ERROR : ret;
+}
+
+/** Escribe la respuesta del request al cliente */
+static unsigned
+request_write(struct selector_key *key) {
+    struct request_st *d = &ATTACHMENT(key)->client.request;
+    struct socks5 *s = ATTACHMENT(key);
+    unsigned  ret      = REQUEST_WRITE;
+    uint8_t  *ptr;
+    size_t    count;
+    ssize_t   n;
+
+    ptr = buffer_read_ptr(d->wb, &count);
+    n = send(key->fd, ptr, count, MSG_NOSIGNAL);
+    
+    if(n == -1) {
+        ret = ERROR;
+    } else {
+        buffer_read_adv(d->wb, n);
+        if(!buffer_can_read(d->wb)) {
+            // Terminamos de enviar
+            if(s->origin_fd < 0) {
+                // Falló la conexión
+                ret = ERROR;
+            } else {
+                // Conexión exitosa, pasar a COPY
+                buffer_reset(d->rb);
+                buffer_reset(d->wb);
+                // Por ahora pasamos a DONE hasta implementar COPY
+                ret = DONE;
+            }
+        }
+    }
+
+    return ret;
+}
+
+static unsigned
+copy_read(struct selector_key *key) {
+    (void)key;
+    return ERROR;
+}
+
+static unsigned
+copy_write(struct selector_key *key) {
+    (void)key;
+    return ERROR;
 }
 
 /** definición de handlers para cada estado */
@@ -278,7 +689,41 @@ static const struct state_definition client_statbl[] = {
         .on_departure     = hello_read_close,
         .on_read_ready    = hello_read,
     },
-…
+    {
+        .state            = HELLO_WRITE,
+        .on_write_ready   = hello_write,
+    },
+    {
+        .state            = REQUEST_READ,
+        .on_arrival       = request_init,
+        .on_departure     = request_close,
+        .on_read_ready    = request_read,
+    },
+    {
+        .state            = REQUEST_RESOLVING,
+        // TODO: implementar
+    },
+    {
+        .state            = REQUEST_CONNECTING,
+        .on_arrival       = request_connecting_init,
+        .on_read_ready    = request_connecting,
+    },
+    {
+        .state            = REQUEST_WRITE,
+        .on_write_ready   = request_write,
+    },
+    {
+        .state            = COPY,
+        .on_read_ready    = copy_read,
+        .on_write_ready   = copy_write,
+    },
+    {
+        .state            = DONE,
+    },
+    {
+        .state            = ERROR,
+    }
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Handlers top level de la conexión pasiva.
