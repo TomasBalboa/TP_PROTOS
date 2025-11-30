@@ -1,0 +1,38 @@
+# Archivos de compilación
+*.o
+*.so
+*.a
+*.dylib
+
+# Directorios de build
+build/
+bin/
+
+# Archivos de depuración
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Core dumps
+core
+core.*
+
+# Ejecutables
+socks5d
+admin_client
+
+# Archivos de editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Archivos de log
+*.log
+
+# Archivos temporales
+*.tmp
+*.temp
