@@ -7,6 +7,7 @@
 #include <assert.h> // :)
 #include <errno.h>  // :)
 #include <pthread.h>
+#include <signal.h> // sigaction, sigprocmask, etc.
 
 #include <stdint.h> // SIZE_MAX
 #include <unistd.h>
@@ -14,7 +15,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
-#include <sys/signal.h>
 #include "selector.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
@@ -50,6 +50,7 @@ selector_error(const selector_status status) {
 
 static void
 wake_handler(const int signal) {
+    (void)signal; // Marca como intencionalmente sin usar
     // nada que hacer. está solo para interrumpir el select
 }
 
