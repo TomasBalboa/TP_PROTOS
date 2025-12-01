@@ -25,6 +25,7 @@
 
 #include "selector.h"
 #include "socks5nio.h"
+#include "resolver_pool.h"
 
 static bool done = false;
 
@@ -111,6 +112,9 @@ main(const int argc, const char **argv) {
         goto finally;
     }
 
+    // Inicializar thread pool de resolución DNS
+    resolver_pool_init();
+
     selector = selector_new(1024);
     if(selector == NULL) {
         err_msg = "unable to create selector";
@@ -155,6 +159,9 @@ finally:
         selector_destroy(selector);
     }
     selector_close();
+
+    // Destruir thread pool de resolución DNS
+    resolver_pool_destroy();
 
     socksv5_pool_destroy();
 
