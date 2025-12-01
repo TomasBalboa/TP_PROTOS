@@ -496,7 +496,7 @@ request_close(const unsigned state, struct selector_key *key) {
 }
 
 /** Inicializa el estado de conexión al origin */
-static void
+static unsigned
 request_connecting_init(const unsigned state, struct selector_key *key) {
     (void)state;
     struct request_st *d = &ATTACHMENT(key)->client.request;
@@ -530,22 +530,10 @@ request_connecting_init(const unsigned state, struct selector_key *key) {
         // Error de resolución
         s->origin_resolution = NULL;
         d->reply = SOCKS5_REPLY_HOST_UNREACHABLE;
+        goto write_response;
     }
     
     s->origin_resolution_current = s->origin_resolution;
-}
-
-/** Intenta conectar al origin server */
-static unsigned
-request_connecting(struct selector_key *key) {
-    struct request_st *d = &ATTACHMENT(key)->client.request;
-    struct socks5 *s = ATTACHMENT(key);
-    
-    if(s->origin_resolution == NULL) {
-        // No se pudo resolver
-        d->reply = SOCKS5_REPLY_HOST_UNREACHABLE;
-        goto write_response;
-    }
     
     // Intentar conectar
     while(s->origin_resolution_current != NULL) {
@@ -566,10 +554,10 @@ request_connecting(struct selector_key *key) {
         }
         
         // Conectar
-        int ret = connect(origin_fd, s->origin_resolution_current->ai_addr,
-                          s->origin_resolution_current->ai_addrlen);
+        int conn_ret = connect(origin_fd, s->origin_resolution_current->ai_addr,
+                               s->origin_resolution_current->ai_addrlen);
         
-        if(ret == 0 || (ret == -1 && errno == EINPROGRESS)) {
+        if(conn_ret == 0 || (conn_ret == -1 && errno == EINPROGRESS)) {
             // Conexión exitosa o en progreso
             s->origin_fd = origin_fd;
             d->reply = SOCKS5_REPLY_SUCCESS;
@@ -595,6 +583,23 @@ write_response:
         int written = request_write_response(ptr, d->reply, &bind_addr, 0);
         buffer_write_adv(d->wb, written);
         
+        // Si la conexión falló, solo escribir respuesta al cliente
+        if(d->reply != SOCKS5_REPLY_SUCCESS) {
+            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
+                return REQUEST_WRITE;
+            }
+            return ERROR;
+        }
+        
+        // Conexión exitosa - registrar origin_fd y esperar que se vuelva writable
+        selector_status ss = selector_register(key->s, s->origin_fd, 
+                                               &socks5_handler, 
+                                               OP_WRITE, s);
+        if (ss != SELECTOR_SUCCESS) {
+            return ERROR;
+        }
+        
+        // Escribir respuesta al cliente
         if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
             return REQUEST_WRITE;
         }
@@ -620,12 +625,8 @@ request_read(struct selector_key *key) {
         const enum request_state st = request_consume(d->rb, &d->parser, &error);
         
         if(request_is_done(st)) {
-            // Request completo, pasar a conectar
-            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_NOOP)) {
-                ret = REQUEST_CONNECTING;
-            } else {
-                ret = ERROR;
-            }
+            // Request completo, conectar y preparar respuesta
+            ret = request_connecting_init(REQUEST_CONNECTING, key);
         }
     } else {
         ret = ERROR;
@@ -652,20 +653,41 @@ request_write(struct selector_key *key) {
     } else {
         buffer_read_adv(d->wb, n);
         if(!buffer_can_read(d->wb)) {
-            // Terminamos de enviar
+            // Terminamos de enviar la respuesta al cliente
             if(s->origin_fd < 0) {
-                // Falló la conexión
                 ret = ERROR;
             } else {
-                // Conexión exitosa, pasar a COPY
-                buffer_reset(d->rb);
-                buffer_reset(d->wb);
-                ret = COPY;
+                // La respuesta está enviada. El origin_fd ya está registrado con OP_WRITE
+                // esperando que la conexión se complete. 
+                // Desactivar interés en client_fd hasta que origin esté listo.
+                selector_set_interest_key(key, OP_NOOP);
+                ret = REQUEST_CONNECTING;
             }
         }
     }
 
     return ret;
+}
+
+/** Handler cuando el origin_fd se vuelve writable (conexión completada) */
+static unsigned
+request_connecting_write(struct selector_key *key) {
+    struct socks5 *s = ATTACHMENT(key);
+    
+    // Verificar que la conexión se completó sin errores
+    int error = 0;
+    socklen_t len = sizeof(error);
+    if (getsockopt(key->fd, SOL_SOCKET, SO_ERROR, &error, &len) == 0) {
+        if (error != 0) {
+            return ERROR;
+        }
+    }
+    
+    // Conexión exitosa - pasar a COPY
+    buffer_reset(&s->read_buffer);
+    buffer_reset(&s->write_buffer);
+    
+    return COPY;
 }
 
 // ============================================================================
@@ -682,23 +704,16 @@ copy_init(const unsigned state, struct selector_key *key) {
     s->client.copy.fd = &s->client_fd;
     s->client.copy.rb = &s->read_buffer;
     s->client.copy.wb = &s->write_buffer;
-    s->client.copy.duplex = OP_READ | OP_WRITE;
+    s->client.copy.duplex = OP_READ;
     
     s->orig.copy.fd = &s->origin_fd;
     s->orig.copy.rb = &s->write_buffer;
     s->orig.copy.wb = &s->read_buffer;
-    s->orig.copy.duplex = OP_READ | OP_WRITE;
+    s->orig.copy.duplex = OP_READ;
     
-    // Registrar el origin_fd en el selector
-    selector_status ss = selector_register(key->s, s->origin_fd, 
-                                           &socks5_handler, 
-                                           OP_READ, s);
-    if (ss != SELECTOR_SUCCESS) {
-        // Error al registrar
-    }
-    
-    // Configurar intereses para ambos fds
-    selector_set_interest_key(key, OP_READ);
+    // Configurar intereses: leer de ambos lados
+    selector_set_interest(key->s, s->client_fd, OP_READ);
+    selector_set_interest(key->s, s->origin_fd, OP_READ);
 }
 
 /**
@@ -734,11 +749,13 @@ copy_is_done(struct socks5 *s) {
         return true;
     }
     
-    // Verificar si no hay más datos por transferir
+    // Terminamos cuando ambos lados cerraron (OP_NOOP) y no hay datos pendientes
+    bool client_closed = (s->client.copy.duplex == OP_NOOP);
+    bool origin_closed = (s->orig.copy.duplex == OP_NOOP);
     bool no_client_data = !buffer_can_read(&s->read_buffer);
     bool no_origin_data = !buffer_can_read(&s->write_buffer);
     
-    return no_client_data && no_origin_data;
+    return client_closed && origin_closed && no_client_data && no_origin_data;
 }
 
 static unsigned
@@ -792,17 +809,20 @@ copy_read(struct selector_key *key) {
             shutdown(*fd_dst, SHUT_WR);
         }
         
+        // Actualizar intereses: ya no podemos leer de este fd
+        d->duplex = OP_NOOP;
+        selector_set_interest(key->s, *fd_src, OP_NOOP);
+        
+        // Actualizar intereses del otro fd
+        if (key->fd == s->client_fd) {
+            copy_compute_interests(key->s, &s->orig.copy);
+        } else {
+            copy_compute_interests(key->s, &s->client.copy);
+        }
+        
         // Verificar si terminamos
         if (copy_is_done(s)) {
             ret = DONE;
-        } else {
-            // Actualizar intereses
-            copy_compute_interests(key->s, d);
-            if (key->fd == s->client_fd) {
-                copy_compute_interests(key->s, &s->orig.copy);
-            } else {
-                copy_compute_interests(key->s, &s->client.copy);
-            }
         }
         
     } else {
@@ -844,11 +864,15 @@ copy_write(struct selector_key *key) {
         // Actualizar intereses
         copy_compute_interests(key->s, d);
         
-        // Actualizar intereses del otro fd
+        // Actualizar intereses del otro fd (solo si no está cerrado)
         if (key->fd == s->client_fd) {
-            copy_compute_interests(key->s, &s->orig.copy);
+            if (s->orig.copy.duplex != OP_NOOP) {
+                copy_compute_interests(key->s, &s->orig.copy);
+            }
         } else {
-            copy_compute_interests(key->s, &s->client.copy);
+            if (s->client.copy.duplex != OP_NOOP) {
+                copy_compute_interests(key->s, &s->client.copy);
+            }
         }
         
         // Verificar si terminamos
@@ -888,8 +912,7 @@ static const struct state_definition client_statbl[] = {
     },
     {
         .state            = REQUEST_CONNECTING,
-        .on_arrival       = request_connecting_init,
-        .on_read_ready    = request_connecting,
+        .on_write_ready   = request_connecting_write,
     },
     {
         .state            = REQUEST_WRITE,

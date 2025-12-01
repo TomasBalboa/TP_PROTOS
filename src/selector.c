@@ -468,7 +468,7 @@ handle_iteration(fd_selector s) {
                     }
                 }
             }
-            if(FD_ISSET(i, &s->slave_w)) {
+            if(FD_ISSET(item->fd, &s->slave_w)) {
                 if(OP_WRITE & item->interest) {
                     if(0 == item->handler->handle_write) {
                         assert(("OP_WRITE arrived but no handler. bug!" == 0));
@@ -545,6 +545,7 @@ selector_select(fd_selector s) {
 
     int fds = pselect(s->max_fd + 1, &s->slave_r, &s->slave_w, 0, &s->slave_t,
                       &emptyset);
+    
     if(-1 == fds) {
         switch(errno) {
             case EAGAIN:
