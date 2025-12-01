@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "selector.h"
+#include "buffer.h"
+#include "stm.h"
 
 // ============================================================================
 // CONSTANTES DEL PROTOCOLO SOCKS5 - RFC1928

@@ -21,6 +21,7 @@ COMMON_SRC = $(SRC_DIR)/buffer.c \
 
 SOCKS5_SRC = $(SRC_DIR)/socks5/hello.c \
              $(SRC_DIR)/socks5/request.c \
+             $(SRC_DIR)/socks5/copy.c \
              $(SRC_DIR)/socks5/socks5nio.c
 
 SERVER_SRC = $(SRC_DIR)/main.c \
