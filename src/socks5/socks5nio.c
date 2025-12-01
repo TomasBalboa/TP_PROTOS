@@ -423,20 +423,46 @@ request_read(struct selector_key *key) {
 
     ptr = buffer_write_ptr(d->rb, &count);
     n = recv(key->fd, ptr, count, 0);
-    
-    if(n > 0) {
+
+    if (n > 0) {
         buffer_write_adv(d->rb, n);
         const enum request_state st = request_consume(d->rb, &d->parser, &error);
-        
-        if(request_is_done(st)) {
-            // Request completo, conectar y preparar respuesta
+
+        if (st == REQUEST_ERROR) {
+            // 1) El parser detectó un request inválido.
+            //    No intentamos conectar, respondemos error al cliente.
+
+            // Por ahora usamos un reply genérico; luego se puede refinar según el motivo.
+            d->reply = SOCKS5_REPLY_GENERAL_FAILURE;
+
+            struct in_addr bind_addr;
+            bind_addr.s_addr = INADDR_ANY;
+
+            size_t   nbytes;
+            uint8_t *wptr = buffer_write_ptr(d->wb, &nbytes);
+            int written = request_write_response(wptr, d->reply, &bind_addr, 0);
+            buffer_write_adv(d->wb, written);
+
+            // Cambiamos interés a escritura para mandar el reply al cliente.
+            if (SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
+                ret = REQUEST_WRITE;
+            } else {
+                ret = ERROR;
+            }
+
+        } else if (st == REQUEST_DONE) {
+            // 2) Request completo y válido → pasar a la lógica de conexión al origin.
             ret = request_connecting_init(REQUEST_CONNECTING, key);
+        } else {
+            // 3) Mensaje aún incompleto → seguimos en REQUEST_READ.
+            ret = REQUEST_READ;
         }
     } else {
+        // EOF o error en recv
         ret = ERROR;
     }
 
-    return error ? ERROR : ret;
+    return ret;
 }
 
 /** Escribe la respuesta del request al cliente */
