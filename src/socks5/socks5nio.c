@@ -32,7 +32,7 @@ static unsigned       pool_size = 0;
 static const unsigned max_pool  = 50;
 
 /** Forward declaration de la tabla de estados */
-static const struct state_definition client_statbl[];
+static const struct state_definition client_statbl[9];
 
 /** crea un nuevo objeto socks5 */
 static struct socks5 *

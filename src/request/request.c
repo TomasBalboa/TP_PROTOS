@@ -63,7 +63,7 @@ bool request_parser_parse(struct request_parser *p, buffer *buf) {
                 break;
                 
             case REQUEST_ADDR_DOMAIN_LEN:
-                if (byte == 0 || byte > 255) {
+                if (byte == 0 /*|| byte > 255*/ ) {
                     p->state = REQUEST_ERROR;
                     return false;
                 }
@@ -180,7 +180,7 @@ enum request_state request_consume(buffer *buf, struct request_parser *p, bool *
                 break;
                 
             case REQUEST_ADDR_DOMAIN_LEN:
-                if (byte == 0 || byte > 255) {
+                if (byte == 0 /*|| byte > 255*/ ) {
                     p->state = REQUEST_ERROR;
                     *errored = true;
                     return p->state;
