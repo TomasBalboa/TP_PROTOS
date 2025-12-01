@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "selector.h": "c"
+        "selector.h": "c",
+        "copy.h": "c",
+        "socks5_internal.h": "c"
     }
 }
