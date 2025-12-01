@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <pthread.h>
 #include <sys/socket.h>
 
 #include "buffer.h"
@@ -10,6 +11,7 @@
 #include "hello.h"
 #include "request.h"
 #include "copy.h"
+#include "resolver_pool.h"
 
 /** Macro para obtener el struct socks5 desde la llave de selección */
 #define ATTACHMENT(key) ( (struct socks5 *)(key)->data)
@@ -86,8 +88,12 @@ struct socks5 {
     uint8_t                 raw_buff_a[4096], raw_buff_b[4096];
     buffer                  read_buffer, write_buffer;
 
-    /** cantidad de referencias a este objeto */
-    unsigned                references;
+    /** cantidad de referencias a este objeto (protegido por mutex) */
+    int                     references;
+    pthread_mutex_t         ref_mutex;
+
+    /** resolución DNS asíncrona */
+    struct resolution_job  *pending_resolution;
 
     /** siguiente en el pool */
     struct socks5          *next;
