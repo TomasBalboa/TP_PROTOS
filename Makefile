@@ -46,7 +46,7 @@ server: $(SERVER_BIN)
 $(BUILD_DIR) $(BIN_DIR):
 	mkdir -p $@
 
-$(BUILD_DIR)/src $(BUILD_DIR)/src/socks5:
+$(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request:
 	mkdir -p $@
 
 # Compilar servidor
@@ -55,7 +55,7 @@ $(SERVER_BIN): $(SERVER_OBJ) | $(BIN_DIR)
 	@echo "✓ Servidor compilado: $@"
 
 # Regla genérica para objetos
-$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR) $(BUILD_DIR)/src $(BUILD_DIR)/src/socks5
+$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR) $(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request
 	$(CC) $(CFLAGS) -I$(INC_DIR) -I$(SRC_DIR)/socks5 -c $< -o $@
 
 # Limpiar
