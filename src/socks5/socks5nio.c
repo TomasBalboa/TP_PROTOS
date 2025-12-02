@@ -25,29 +25,42 @@
 // Tamaño de buffers
 #define BUFFER_SIZE 4096
 
-////////////////////////////////////////////////////////////////////
+///////////////////(...)::)::::::::::::::::D~~~////////////////////////////////
 // Pool de objetos socks5
-
+//ret --> X 
+//pool --> NULL
+//pool_size = 0, max_pool = 50
+//DESTROY 
+/*
+ret.next -> pool --> NULL 
+pool --> X --> NULL 
+pool_size = 1
+*/
+//pool --> A --> B --> C --> NULL
 /** pool de objetos socks5 */
 static struct client_info *pool = NULL;
 static unsigned       pool_size = 0;
 static const unsigned max_pool  = 50;
+static pthread_mutex_t pool_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /** Forward declaration de la tabla de estados */
 static const struct state_definition client_statbl[9];
 
 /** crea un nuevo objeto socks5 */
-static struct client_info *
-socks5_new(int client_fd) {
+static struct client_info * socks5_new(int client_fd) {
     struct client_info *ret;
 
+    pthread_mutex_lock(&pool_mutex);
     if (pool == NULL) {
+        pthread_mutex_unlock(&pool_mutex);
         ret = malloc(sizeof(*ret));
     } else {
+        /* popeas la cabeza del pool*/
         ret       = pool;
         pool      = pool->next;
         ret->next = NULL;
         pool_size--;
+        pthread_mutex_unlock(&pool_mutex);
     }
 
     if (ret == NULL) {
@@ -77,8 +90,7 @@ socks5_new(int client_fd) {
 
 
 /** realmente destruye */
-static void
-socks5_destroy_(struct client_info* s) {
+static void socks5_destroy_(struct client_info* s) {
     if(s->origin_resolution != NULL) {
         freeaddrinfo(s->origin_resolution);
         s->origin_resolution = 0;
@@ -97,8 +109,7 @@ socks5_destroy_(struct client_info* s) {
  * destruye un  `struct client_info', tiene en cuenta las referencias
  * y el pool de objetos.
  */
-void
-socks5_destroy(struct client_info *s) {
+void socks5_destroy(struct client_info *s) {
     if(s == NULL) {
         return;
     }
@@ -109,23 +120,31 @@ socks5_destroy(struct client_info *s) {
     pthread_mutex_unlock(&s->ref_mutex);
     
     if(refs == 0) {
-        // Última referencia - destruir mutex y liberar
+        /* Última referencia - destruir mutex interno */
         pthread_mutex_destroy(&s->ref_mutex);
-        
+        pthread_mutex_lock(&pool_mutex);
         if(pool_size < max_pool) {
             s->next = pool;
             pool    = s;
             pool_size++;
+            pthread_mutex_unlock(&pool_mutex);
         } else {
+            pthread_mutex_unlock(&pool_mutex);
             socks5_destroy_(s);
         }
     }
 }
 
-void
-socksv5_pool_destroy(void) {
+void socksv5_pool_destroy(void) {
     struct client_info *next, *s;
-    for(s = pool; s != NULL ; s = next) {
+    /* Move pool contents out while holding lock, then free without the lock */
+    pthread_mutex_lock(&pool_mutex);
+    s = pool;
+    pool = NULL;
+    pool_size = 0;
+    pthread_mutex_unlock(&pool_mutex);
+
+    for(; s != NULL ; s = next) {
         next = s->next;
         free(s);
     }
