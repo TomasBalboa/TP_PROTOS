@@ -2,6 +2,11 @@
 #define REQUEST_HANDLER_H
 
 #include "selector.h"
+#include "socks5_internal.h"
+
+/* Funciones exportadas desde socks5nio.c */
+extern struct fd_handler socks5_handler;
+void socks5_destroy(struct client_info *s);
 
 void request_init(const unsigned state, struct selector_key *key);
 void request_close(const unsigned state, struct selector_key *key);

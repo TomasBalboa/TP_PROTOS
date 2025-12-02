@@ -97,7 +97,7 @@ socks5_destroy_(struct client_info* s) {
  * destruye un  `struct client_info', tiene en cuenta las referencias
  * y el pool de objetos.
  */
-static void
+void
 socks5_destroy(struct client_info *s) {
     if(s == NULL) {
         return;
@@ -137,7 +137,7 @@ socksv5_pool_destroy(void) {
 static void socksv5_read   (struct selector_key *key);
 static void socksv5_write  (struct selector_key *key);
 static void socksv5_block  (struct selector_key *key);
-static const struct fd_handler socks5_handler = {
+struct fd_handler socks5_handler = {
     .handle_read   = socksv5_read,
     .handle_write  = socksv5_write,
     .handle_close  = socksv5_close,
