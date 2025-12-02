@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <sys/socket.h>
+#include <netdb.h>
 
 #include "buffer.h"
 #include "stm.h"
@@ -13,8 +14,9 @@
 #include "copy.h"
 #include "resolver_pool.h"
 
-/** Macro para obtener el struct socks5 desde la llave de selección */
-#define ATTACHMENT(key) ( (struct socks5 *)(key)->data)
+/** Macro para obtener el struct client_info desde la llave de selección */
+#define ATTACHMENT(key) ( (struct client_info *)(key)->data)
+#define BUFFER 4096
 
 /** Estados de la máquina de estados SOCKS5 */
 enum socks_v5state {
@@ -70,45 +72,28 @@ struct connecting {
 };
 
 /** Estructura completa de una sesión SOCKS5 */
-struct socks5 {
-    /** información del cliente */
+struct client_info {
+    int                     client_fd, origin_fd;
     struct sockaddr_storage client_addr;
-    socklen_t               client_addr_len;
-    int                     client_fd;
-
-    /** información del origen */
-    int                     origin_fd;
-    struct addrinfo        *origin_resolution;
-    struct addrinfo        *origin_resolution_current;
-
-    /** máquina de estados */
     struct state_machine    stm;
-
-    /** buffers para transferir entre client y origin */
-    uint8_t                 raw_buff_a[4096], raw_buff_b[4096];
-    buffer                  read_buffer, write_buffer;
-
-    /** cantidad de referencias a este objeto (protegido por mutex) */
-    int                     references;
-    pthread_mutex_t         ref_mutex;
-
-    /** resolución DNS asíncrona */
-    struct resolution_job  *pending_resolution;
-
-    /** siguiente en el pool */
-    struct socks5          *next;
-
-    /** campos por cada estado */
     union {
-        struct hello_st     hello;
+        struct hello_st     hello; // handshake
         struct request_st   request;
-        struct copy         copy;
+        // struct auth_st authenticate;
     } client;
-
-    union {
-        struct connecting   conn;
-        struct copy         copy;
-    } orig;
+    bool is_closed;
+    uint8_t                 buff_origin[BUFFER], buff_client[BUFFER];
+    buffer                  origin_buffer, client_buffer;
+    struct addrinfo        *origin_resolution;
+    struct addrinfo        *current_resolution;
+    fd_selector selector;
+    struct gaicb dns_req;
+    char dns_host[256];
+    char dns_port[6];
+    char username[65];
+    bool addr_resolved;
+    bool is_admin;
+    bool access_registered;
 };
 
 #endif

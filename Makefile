@@ -2,7 +2,7 @@
 # TP Protocolos de Comunicación 2025/2
 
 CC       = gcc
-CFLAGS   = -std=c11 -Wall -Werror -Wextra -pedantic -D_POSIX_C_SOURCE=200809L -g
+CFLAGS   = -std=c11 -Wall -Werror -Wextra -pedantic -D_POSIX_C_SOURCE=200809L -g -D_GNU_SOURCE
 LDFLAGS  = -pthread
 
 # Directorios

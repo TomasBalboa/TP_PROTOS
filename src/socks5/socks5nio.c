@@ -27,7 +27,7 @@
 // Pool de objetos socks5
 
 /** pool de objetos socks5 */
-static struct socks5 *pool = NULL;
+static struct client_info *pool = NULL;
 static unsigned       pool_size = 0;
 static const unsigned max_pool  = 50;
 
@@ -35,9 +35,9 @@ static const unsigned max_pool  = 50;
 static const struct state_definition client_statbl[9];
 
 /** crea un nuevo objeto socks5 */
-static struct socks5 *
+static struct client_info *
 socks5_new(int client_fd) {
-    struct socks5 *ret;
+    struct client_info *ret;
 
     if (pool == NULL) {
         ret = malloc(sizeof(*ret));
@@ -75,7 +75,7 @@ socks5_new(int client_fd) {
 
 /** realmente destruye */
 static void
-socks5_destroy_(struct socks5* s) {
+socks5_destroy_(struct client_info* s) {
     if(s->origin_resolution != NULL) {
         freeaddrinfo(s->origin_resolution);
         s->origin_resolution = 0;
@@ -91,37 +91,50 @@ socks5_destroy_(struct socks5* s) {
 }
 
 /**
- * destruye un  `struct socks5', tiene en cuenta las referencias
+ * destruye un  `struct client_info', tiene en cuenta las referencias
  * y el pool de objetos.
  */
 static void
-socks5_destroy(struct socks5 *s) {
-    if(s == NULL) {
+socks5_destroy(struct client_info *s) {
+    if(s->is_closed) {
         return;
     }
+    s->is_closed = true;
+    printf("Cerrando conexión: fd = %d\n", s->client_fd); // y metricas
     
-    pthread_mutex_lock(&s->ref_mutex);
-    s->references--;
-    int refs = s->references;
-    pthread_mutex_unlock(&s->ref_mutex);
-    
-    if(refs == 0) {
-        // Última referencia - destruir mutex y liberar
-        pthread_mutex_destroy(&s->ref_mutex);
-        
-        if(pool_size < max_pool) {
-            s->next = pool;
-            pool    = s;
-            pool_size++;
-        } else {
-            socks5_destroy_(s);
-        }
+    if(s->client_fd >= 0){
+        selector_unregister_fd(key->s, s->client_fd);
+        close(s->client_fd);
+        s->client_fd = -1;
     }
+    if(s->origin_fd >= 0){
+        selector_unregister_fd(key->s, s->origin_fd);
+        close(s->origin_fd);
+        s->origin_fd = -1;
+    }
+    free(s);
+
+    // manejo de semaforos de implementacion original
+    // pthread_mutex_lock(&s->ref_mutex);
+    // s->references--;
+    // int refs = s->references;
+    // pthread_mutex_unlock(&s->ref_mutex);
+    // if(refs == 0) {
+    //     // Última referencia - destruir mutex y liberar
+    //     pthread_mutex_destroy(&s->ref_mutex);
+    //     if(pool_size < max_pool) {
+    //         s->next = pool;
+    //         pool    = s;
+    //         pool_size++;
+    //     } else {
+    //         socks5_destroy_(s);
+    //     }
+    // }
 }
 
 void
 socksv5_pool_destroy(void) {
-    struct socks5 *next, *s;
+    struct client_info *next, *s;
     for(s = pool; s != NULL ; s = next) {
         next = s->next;
         free(s);
@@ -134,7 +147,6 @@ socksv5_pool_destroy(void) {
 static void socksv5_read   (struct selector_key *key);
 static void socksv5_write  (struct selector_key *key);
 static void socksv5_block  (struct selector_key *key);
-static void socksv5_close  (struct selector_key *key);
 static const struct fd_handler socks5_handler = {
     .handle_read   = socksv5_read,
     .handle_write  = socksv5_write,
@@ -147,7 +159,7 @@ void
 socksv5_passive_accept(struct selector_key *key) {
     struct sockaddr_storage       client_addr;
     socklen_t                     client_addr_len = sizeof(client_addr);
-    struct socks5                *state           = NULL;
+    struct client_info                *state           = NULL;
 
     const int client = accept(key->fd, (struct sockaddr*) &client_addr,
                                                           &client_addr_len);
@@ -316,7 +328,7 @@ request_close(const unsigned state, struct selector_key *key) {
 
 /** Incrementa referencia thread-safe */
 static void
-socks5_ref(struct socks5 *s) {
+socks5_ref(struct client_info *s) {
     if (s != NULL) {
         pthread_mutex_lock(&s->ref_mutex);
         s->references++;
@@ -327,7 +339,7 @@ socks5_ref(struct socks5 *s) {
 /** Escribe respuesta de error al cliente */
 static unsigned
 request_write_error_response(struct selector_key *key) {
-    struct socks5 *s = ATTACHMENT(key);
+    struct client_info *s = ATTACHMENT(key);
     struct request_st *d = &s->client.request;
     
     // Preparar respuesta de error
@@ -351,7 +363,7 @@ request_write_error_response(struct selector_key *key) {
 /** Intenta conectar al origin (después de resolver) */
 static unsigned
 request_try_connect(struct selector_key *key) {
-    struct socks5 *s = ATTACHMENT(key);
+    struct client_info *s = ATTACHMENT(key);
     struct request_st *d = &s->client.request;
     
     // Intentar cada dirección resuelta
@@ -421,7 +433,7 @@ request_try_connect(struct selector_key *key) {
 static unsigned
 request_resolving_init_do(const unsigned state, struct selector_key *key) {
     (void)state;
-    struct socks5 *s = ATTACHMENT(key);
+    struct client_info *s = ATTACHMENT(key);
     struct request_parser *p = &s->client.request.parser;
     
     // Crear job de resolución
@@ -491,7 +503,7 @@ request_resolving_init(const unsigned state, struct selector_key *key) {
 /** Handler cuando la resolución se completa (llamado por selector) */
 static unsigned
 request_resolving_block_ready(struct selector_key *key) {
-    struct socks5 *s = ATTACHMENT(key);
+    struct client_info *s = ATTACHMENT(key);
     struct resolution_job *job = s->pending_resolution;
     
     if (job == NULL) {
@@ -589,7 +601,7 @@ request_read(struct selector_key *key) {
 static unsigned
 request_write(struct selector_key *key) {
     struct request_st *d = &ATTACHMENT(key)->client.request;
-    struct socks5 *s = ATTACHMENT(key);
+    struct client_info *s = ATTACHMENT(key);
     unsigned  ret      = REQUEST_WRITE;
     uint8_t  *ptr;
     size_t    count;
@@ -622,7 +634,7 @@ request_write(struct selector_key *key) {
 /** Handler cuando el origin_fd se vuelve writable (conexión completada) */
 static unsigned
 request_connecting_write(struct selector_key *key) {
-    struct socks5 *s = ATTACHMENT(key);
+    struct client_info *s = ATTACHMENT(key);
     
     // Verificar que la conexión se completó sin errores
     int error = 0;
@@ -721,7 +733,7 @@ socksv5_block(struct selector_key *key) {
     }
 }
 
-static void
+void
 socksv5_close(struct selector_key *key) {
     socks5_destroy(ATTACHMENT(key));
 }
