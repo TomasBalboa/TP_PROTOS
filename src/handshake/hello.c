@@ -1,151 +1,101 @@
-/**
- * hello.c - Implementación del parser de handshake SOCKS5
- */
+#include "socks5_internal.h"
+#include "buffer.h"
+#include "stm.h"
+#include "netutils.h"
 #include "hello.h"
-#include <string.h>
+#include "hello_parser.h"
 
-void hello_parser_init(struct hello_parser *p) {
-    memset(p, 0, sizeof(*p));
-    p->state = HELLO_VERSION;
+// Handlers de estado HELLO trasladados desde socks5nio.c
+
+void hello_read_init(const unsigned state, struct selector_key *key) {
+    struct hello_st *d = &ATTACHMENT(key)->client.hello;
+    (void)state;
+
+    d->rb     = &(ATTACHMENT(key)->client_buffer);
+    d->wb     = &(ATTACHMENT(key)->origin_buffer);
+    d->method = SOCKS5_AUTH_NO_ACCEPTABLE;
+    hello_parser_init(&d->parser);
 }
 
-void hello_parser_close(struct hello_parser *p) {
-    // Por ahora no hay nada que liberar
-    (void)p;
-}
+static unsigned hello_process(const struct hello_st* d) {
+    unsigned ret = HELLO_WRITE;
 
-enum hello_state hello_consume(buffer *buf, struct hello_parser *p, bool *errored) {
-    *errored = false;
-    
-    while (buffer_can_read(buf)) {
-        uint8_t byte = buffer_read(buf);
-        
-        switch (p->state) {
-            case HELLO_VERSION:
-                if (byte != SOCKS5_VERSION) {
-                    p->state = HELLO_ERROR;
-                    *errored = true;
-                    return p->state;
-                }
-                p->state = HELLO_NMETHODS;
-                break;
-                
-            case HELLO_NMETHODS:
-                if (byte == 0) {
-                    p->state = HELLO_ERROR;
-                    *errored = true;
-                    return p->state;
-                }
-                p->nmethods = byte;
-                p->methods_read = 0;
-                p->state = HELLO_METHODS;
-                break;
-                
-            case HELLO_METHODS:
-                p->methods[p->methods_read++] = byte;
-                if (p->methods_read == p->nmethods) {
-                    p->state = HELLO_DONE;
-                    return p->state;
-                }
-                break;
-                
-            case HELLO_DONE:
-            case HELLO_ERROR:
-                return p->state;
+    uint8_t method = SOCKS5_AUTH_NO_AUTH;
+
+    bool found = false;
+    for (uint8_t i = 0; i < d->parser.nmethods; i++) {
+        if (d->parser.methods[i] == SOCKS5_AUTH_NO_AUTH) {
+            found = true;
+            break;
         }
     }
-    
-    return p->state;
-}
 
-bool hello_is_done(enum hello_state state, bool *errored) {
-    if (errored != NULL) {
-        *errored = (state == HELLO_ERROR);
+    if (!found) {
+        method = SOCKS5_AUTH_NO_ACCEPTABLE;
+        ret = ERROR;
     }
-    return state == HELLO_DONE || state == HELLO_ERROR;
-}
 
-int hello_marshall(buffer *buf, uint8_t method) {
-    size_t available;
-    uint8_t *ptr = buffer_write_ptr(buf, &available);
-    
-    if (available < 2) {
-        return -1;
+    if (-1 == hello_marshall(d->wb, method)) {
+        ret = ERROR;
     }
-    
-    ptr[0] = SOCKS5_VERSION;
-    ptr[1] = method;
-    buffer_write_adv(buf, 2);
-    
-    return 0;
+
+    return ret;
 }
 
-// Funciones adicionales (para usar más adelante)
+unsigned hello_read(struct selector_key *key) {
+    struct hello_st *d = &ATTACHMENT(key)->client.hello;
+    unsigned  ret      = HELLO_READ;
+    bool      error    = false;
+    uint8_t  *ptr;
+    size_t    count;
+    ssize_t   n;
 
-enum hello_state hello_parser_feed(struct hello_parser *p, uint8_t byte) {
-    switch (p->state) {
-        case HELLO_VERSION:
-            if (byte != SOCKS5_VERSION) {
-                p->state = HELLO_ERROR;
-                return p->state;
+    ptr = buffer_write_ptr(d->rb, &count);
+    n = recv(key->fd, ptr, count, 0);
+    if(n > 0) {
+        buffer_write_adv(d->rb, n);
+        const enum hello_state st = hello_consume(d->rb, &d->parser, &error);
+        if(hello_is_done(st, 0)) {
+            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
+                ret = hello_process(d);
+            } else {
+                ret = ERROR;
             }
-            p->state = HELLO_NMETHODS;
-            break;
-            
-        case HELLO_NMETHODS:
-            if (byte == 0) {
-                p->state = HELLO_ERROR;
-                return p->state;
-            }
-            p->nmethods = byte;
-            p->methods_read = 0;
-            p->state = HELLO_METHODS;
-            break;
-            
-        case HELLO_METHODS:
-            p->methods[p->methods_read++] = byte;
-            if (p->methods_read == p->nmethods) {
-                p->state = HELLO_DONE;
-            }
-            break;
-            
-        case HELLO_DONE:
-        case HELLO_ERROR:
-            break;
-    }
-    
-    return p->state;
-}
-
-bool hello_has_error(enum hello_state state) {
-    return state == HELLO_ERROR;
-}
-
-uint8_t hello_select_auth_method(struct hello_parser *p, 
-                                  bool no_auth_enabled, 
-                                  bool user_pass_enabled) {
-    if (p->state != HELLO_DONE) {
-        return SOCKS5_AUTH_NO_ACCEPTABLE;
-    }
-    
-    // Buscar el método apropiado
-    for (uint8_t i = 0; i < p->nmethods; i++) {
-        uint8_t method = p->methods[i];
-        
-        if (no_auth_enabled && method == SOCKS5_AUTH_NO_AUTH) {
-            return SOCKS5_AUTH_NO_AUTH;
         }
-        
-        if (user_pass_enabled && method == SOCKS5_AUTH_USER_PASS) {
-            return SOCKS5_AUTH_USER_PASS;
+    } else {
+        ret = ERROR;
+    }
+
+    return error ? ERROR : ret;
+}
+
+void hello_read_close(const unsigned state, struct selector_key *key) {
+    struct hello_st *d = &ATTACHMENT(key)->client.hello;
+    (void)state;
+    hello_parser_close(&d->parser);
+}
+
+unsigned hello_write(struct selector_key *key) {
+    struct hello_st *d = &ATTACHMENT(key)->client.hello;
+    unsigned  ret      = HELLO_WRITE;
+    uint8_t  *ptr;
+    size_t    count;
+    ssize_t   n;
+
+    ptr = buffer_read_ptr(d->wb, &count);
+    n = send(key->fd, ptr, count, MSG_NOSIGNAL);
+    if(n == -1) {
+        ret = ERROR;
+    } else {
+        buffer_read_adv(d->wb, n);
+        if(!buffer_can_read(d->wb)) {
+            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
+                ret = REQUEST_READ;
+            } else {
+                ret = ERROR;
+            }
         }
     }
-    
-    return SOCKS5_AUTH_NO_ACCEPTABLE;
-}
 
-int hello_write_response(uint8_t *buffer, uint8_t method) {
-    buffer[0] = SOCKS5_VERSION;
-    buffer[1] = method;
-    return 2;
+    return ret;
 }

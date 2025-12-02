@@ -3,7 +3,6 @@
 
 #include <sys/time.h>
 #include <stdbool.h>
-
 /**
  * selector.c - un muliplexor de entrada salida
  *

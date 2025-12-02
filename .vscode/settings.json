@@ -2,6 +2,7 @@
     "files.associations": {
         "selector.h": "c",
         "copy.h": "c",
-        "socks5_internal.h": "c"
+        "socks5_internal.h": "c",
+        "stm.h": "c"
     }
 }
