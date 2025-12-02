@@ -23,6 +23,7 @@ COMMON_SRC = $(SRC_DIR)/buffer.c \
 SOCKS5_SRC = $(SRC_DIR)/handshake/hello_parser.c \
              $(SRC_DIR)/handshake/hello.c \
              $(SRC_DIR)/request/request_parser.c \
+			 $(SRC_DIR)/socks5/request_handler.c \
              $(SRC_DIR)/copy.c \
              $(SRC_DIR)/socks5/socks5nio.c
 
