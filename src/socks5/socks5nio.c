@@ -54,15 +54,16 @@ socks5_new(int client_fd) {
 
     memset(ret, 0, sizeof(*ret));
 
-    ret->client_fd           = client_fd;
-    ret->origin_fd           = -1;
-    ret->origin_resolution   = NULL;
-    ret->references          = 1;
+    ret->client_fd                = client_fd;
+    ret->origin_fd                = -1;
+    ret->origin_resolution        = NULL;
+    ret->current_resolution       = NULL;
+    ret->references               = 1;
     pthread_mutex_init(&ret->ref_mutex, NULL);
-    ret->pending_resolution  = NULL;
+    ret->pending_resolution       = NULL;
 
-    buffer_init(&ret->read_buffer,  N(ret->raw_buff_a), ret->raw_buff_a);
-    buffer_init(&ret->write_buffer, N(ret->raw_buff_b), ret->raw_buff_b);
+    buffer_init(&ret->client_buffer, N(ret->buff_client), ret->buff_client);
+    buffer_init(&ret->origin_buffer, N(ret->buff_origin), ret->buff_origin);
 
     ret->stm.initial   = HELLO_READ;
     ret->stm.max_state = ERROR;
@@ -96,40 +97,27 @@ socks5_destroy_(struct client_info* s) {
  */
 static void
 socks5_destroy(struct client_info *s) {
-    if(s->is_closed) {
+    if(s == NULL) {
         return;
     }
-    s->is_closed = true;
-    printf("Cerrando conexión: fd = %d\n", s->client_fd); // y metricas
     
-    if(s->client_fd >= 0){
-        selector_unregister_fd(key->s, s->client_fd);
-        close(s->client_fd);
-        s->client_fd = -1;
+    pthread_mutex_lock(&s->ref_mutex);
+    s->references--;
+    int refs = s->references;
+    pthread_mutex_unlock(&s->ref_mutex);
+    
+    if(refs == 0) {
+        // Última referencia - destruir mutex y liberar
+        pthread_mutex_destroy(&s->ref_mutex);
+        
+        if(pool_size < max_pool) {
+            s->next = pool;
+            pool    = s;
+            pool_size++;
+        } else {
+            socks5_destroy_(s);
+        }
     }
-    if(s->origin_fd >= 0){
-        selector_unregister_fd(key->s, s->origin_fd);
-        close(s->origin_fd);
-        s->origin_fd = -1;
-    }
-    free(s);
-
-    // manejo de semaforos de implementacion original
-    // pthread_mutex_lock(&s->ref_mutex);
-    // s->references--;
-    // int refs = s->references;
-    // pthread_mutex_unlock(&s->ref_mutex);
-    // if(refs == 0) {
-    //     // Última referencia - destruir mutex y liberar
-    //     pthread_mutex_destroy(&s->ref_mutex);
-    //     if(pool_size < max_pool) {
-    //         s->next = pool;
-    //         pool    = s;
-    //         pool_size++;
-    //     } else {
-    //         socks5_destroy_(s);
-    //     }
-    // }
 }
 
 void
@@ -201,8 +189,8 @@ hello_read_init(const unsigned state, struct selector_key *key) {
     struct hello_st *d = &ATTACHMENT(key)->client.hello;
     (void)state;
 
-    d->rb     = &(ATTACHMENT(key)->read_buffer);
-    d->wb     = &(ATTACHMENT(key)->write_buffer);
+    d->rb     = &(ATTACHMENT(key)->client_buffer);
+    d->wb     = &(ATTACHMENT(key)->origin_buffer);
     d->method = SOCKS5_AUTH_NO_ACCEPTABLE;
     hello_parser_init(&d->parser);
 }
@@ -313,8 +301,8 @@ request_init(const unsigned state, struct selector_key *key) {
     struct request_st *d = &ATTACHMENT(key)->client.request;
     (void)state;
 
-    d->rb     = &(ATTACHMENT(key)->read_buffer);
-    d->wb     = &(ATTACHMENT(key)->write_buffer);
+    d->rb     = &(ATTACHMENT(key)->client_buffer);
+    d->wb     = &(ATTACHMENT(key)->origin_buffer);
     request_parser_init(&d->parser);
 }
 
@@ -367,27 +355,27 @@ request_try_connect(struct selector_key *key) {
     struct request_st *d = &s->client.request;
     
     // Intentar cada dirección resuelta
-    while (s->origin_resolution_current != NULL) {
-        int origin_fd = socket(s->origin_resolution_current->ai_family,
-                               s->origin_resolution_current->ai_socktype,
-                               s->origin_resolution_current->ai_protocol);
+    while (s->current_resolution != NULL) {
+        int origin_fd = socket(s->current_resolution->ai_family,
+                               s->current_resolution->ai_socktype,
+                               s->current_resolution->ai_protocol);
         
         if (origin_fd < 0) {
-            s->origin_resolution_current = s->origin_resolution_current->ai_next;
+            s->current_resolution = s->current_resolution->ai_next;
             continue;
         }
         
         // Modo no bloqueante
         if (selector_fd_set_nio(origin_fd) == -1) {
             close(origin_fd);
-            s->origin_resolution_current = s->origin_resolution_current->ai_next;
+            s->current_resolution = s->current_resolution->ai_next;
             continue;
         }
         
         // Conectar (no bloqueante)
         int conn_ret = connect(origin_fd, 
-                              s->origin_resolution_current->ai_addr,
-                              s->origin_resolution_current->ai_addrlen);
+                              s->current_resolution->ai_addr,
+                              s->current_resolution->ai_addrlen);
         
         if (conn_ret == 0 || (conn_ret == -1 && errno == EINPROGRESS)) {
             // Conexión en progreso
@@ -421,7 +409,7 @@ request_try_connect(struct selector_key *key) {
         }
         
         close(origin_fd);
-        s->origin_resolution_current = s->origin_resolution_current->ai_next;
+        s->current_resolution = s->current_resolution->ai_next;
     }
     
     // Todas las conexiones fallaron
@@ -531,7 +519,7 @@ request_resolving_block_ready(struct selector_key *key) {
     } else {
         // Resolución exitosa
         s->origin_resolution = job->result;
-        s->origin_resolution_current = job->result;
+        s->current_resolution = job->result;
         job->result = NULL;  // Transferir ownership
         
         // Intentar conectar
@@ -646,8 +634,8 @@ request_connecting_write(struct selector_key *key) {
     }
     
     // Conexión exitosa - pasar a COPY
-    buffer_reset(&s->read_buffer);
-    buffer_reset(&s->write_buffer);
+    buffer_reset(&s->client_buffer);
+    buffer_reset(&s->origin_buffer);
     
     return COPY;
 }
@@ -752,4 +740,7 @@ socksv5_done(struct selector_key* key) {
             close(fds[i]);
         }
     }
+    
+    // Liberar la estructura (decrementa referencias)
+    socks5_destroy(ATTACHMENT(key));
 }

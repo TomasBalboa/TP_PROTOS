@@ -73,27 +73,48 @@ struct connecting {
 
 /** Estructura completa de una sesión SOCKS5 */
 struct client_info {
+    /** Referencia para la próxima estructura en el pool */
+    struct client_info     *next;
+    
+    /** File descriptors */
     int                     client_fd, origin_fd;
+    
+    /** Dirección del cliente */
     struct sockaddr_storage client_addr;
+    socklen_t               client_addr_len;
+    
+    /** Máquina de estados */
     struct state_machine    stm;
+    
+    /** Estados específicos del cliente */
     union {
-        struct hello_st     hello; // handshake
+        struct hello_st     hello;
         struct request_st   request;
-        // struct auth_st authenticate;
     } client;
-    bool is_closed;
-    uint8_t                 buff_origin[BUFFER], buff_client[BUFFER];
-    buffer                  origin_buffer, client_buffer;
+    
+    /** Buffers para comunicación bidireccional */
+    uint8_t                 buff_client[BUFFER], buff_origin[BUFFER];
+    buffer                  client_buffer, origin_buffer;
+    
+    /** Resolución DNS */
     struct addrinfo        *origin_resolution;
     struct addrinfo        *current_resolution;
-    fd_selector selector;
-    struct gaicb dns_req;
-    char dns_host[256];
-    char dns_port[6];
-    char username[65];
-    bool addr_resolved;
-    bool is_admin;
-    bool access_registered;
+    struct resolution_job  *pending_resolution;
+    
+    /** Reference counting para threads */
+    pthread_mutex_t         ref_mutex;
+    int                     references;
+    
+    /** Selector */
+    fd_selector             selector;
+    
+    /** Flags */
+    bool                    is_closed;
+    bool                    is_admin;
+    bool                    access_registered;
+    
+    /** Username para autenticación */
+    char                    username[65];
 };
 
 #endif

@@ -8,17 +8,6 @@
 #include "buffer.h"
 
 /**
- * Estado de copia para un fd (usado tanto para client como origin)
- */
-struct copy {
-    /** buffers para cada dirección */
-    int    *fd;
-    buffer *rb, *wb;
-    /** intereses en el selector para cada fd */
-    fd_interest duplex;
-};
-
-/**
  * Inicializa el estado COPY para una conexión SOCKS5
  * 
  * @param state   Estado actual (no usado)
