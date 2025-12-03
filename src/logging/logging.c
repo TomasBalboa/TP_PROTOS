@@ -13,8 +13,8 @@
 /** The maximum length a single print into the log buffer SHOULD require. */
 #define LOG_BUFFER_MAX_PRINT_LENGTH 0x200 // 512 bytes
 
-#define LOG_FILE_PERMISSION_BITS 666
-#define LOG_DIR_PERMISSION_BITS 666
+#define LOG_FILE_PERMISSION_BITS 777
+#define LOG_DIR_PERMISSION_BITS 777
 #define LOG_FILE_OPEN_FLAGS (O_WRONLY | O_APPEND | O_CREAT | O_NONBLOCK)
 
 static const char* levels[] = {"[DEBUG]", "[INFO]","[OUTPUT]","[WARNING]","[ERROR]"};
@@ -130,7 +130,7 @@ static int tryOpenLogfile(const char* logFile, struct tm tm) {
 
     char logfilebuf[DEFAULT_LOG_FILE_MAXSTRLEN + 1];
 
-    // If logFile is "", then we instead of the default log file name.
+    // If logFile is "", then we use the default log file name instead.
     if (logFile[0] == '\0') {
         snprintf(logfilebuf, DEFAULT_LOG_FILE_MAXSTRLEN, DEFAULT_LOG_FILE, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900);
         logFile = logfilebuf;
