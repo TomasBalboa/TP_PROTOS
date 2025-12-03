@@ -152,6 +152,8 @@ unsigned request_resolving_init_do(const unsigned state, struct selector_key *ke
     /* Preparar datos de entrada */
     if (p->atyp == SOCKS5_ADDR_TYPE_IPV4) {
         inet_ntop(AF_INET, &p->dest.ipv4, job->hostname, sizeof(job->hostname));
+    } else if (p->atyp == SOCKS5_ADDR_TYPE_IPV6) {
+        inet_ntop(AF_INET6, &p->dest.ipv6, job->hostname, sizeof(job->hostname));
     } else if (p->atyp == SOCKS5_ADDR_TYPE_DOMAIN) {
         strncpy(job->hostname, p->dest.domain.name, sizeof(job->hostname) - 1);
         job->hostname[sizeof(job->hostname) - 1] = '\0';
@@ -162,9 +164,6 @@ unsigned request_resolving_init_do(const unsigned state, struct selector_key *ke
     }
     
     snprintf(job->port, sizeof(job->port), "%d", p->port);
-    
-    fprintf(stderr, "DEBUG: About to resolve hostname='%s' port='%s'\n", 
-            job->hostname, job->port);
     
     memset(&job->hints, 0, sizeof(job->hints));
     job->hints.ai_family = AF_UNSPEC;
@@ -200,7 +199,6 @@ unsigned request_resolving_init_do(const unsigned state, struct selector_key *ke
 
 /* Wrapper para on_arrival */
 void request_resolving_init(const unsigned state, struct selector_key *key) {
-    fprintf(stderr, "DEBUG: request_resolving_init called\n");
     request_resolving_init_do(state, key);
 }
 
@@ -227,8 +225,6 @@ unsigned request_resolving_block_ready(struct selector_key *key) {
     
     if (job->error_code != 0 || job->result == NULL) {
         /* Error en resolución */
-        fprintf(stderr, "DEBUG: DNS resolution failed - error_code=%d, result=%p\n", 
-                job->error_code, (void*)job->result);
         s->client.request.reply = SOCKS5_REPLY_HOST_UNREACHABLE;
         ret = request_write_error_response(key);
     } else {
