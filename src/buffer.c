@@ -46,8 +46,7 @@ buffer_read_ptr(buffer *b, size_t *nbyte) {
     return b->read;
 }
 
-inline void
-buffer_write_adv(buffer *b, const ssize_t bytes) {
+inline void buffer_write_adv(buffer *b, const ssize_t bytes) {
     if(bytes > -1) {
         b->write += (size_t) bytes;
         assert(b->write <= b->limit);

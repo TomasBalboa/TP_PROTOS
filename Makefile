@@ -23,8 +23,10 @@ COMMON_SRC = $(SRC_DIR)/buffer.c \
 
 SOCKS5_SRC = $(SRC_DIR)/handshake/hello_parser.c \
              $(SRC_DIR)/handshake/hello.c \
+             $(SRC_DIR)/auth/auth_parser.c \          
+             $(SRC_DIR)/auth/auth.c \                
              $(SRC_DIR)/request/request_parser.c \
-			 $(SRC_DIR)/socks5/request_handler.c \
+             $(SRC_DIR)/socks5/request_handler.c \
              $(SRC_DIR)/copy.c \
              $(SRC_DIR)/socks5/socks5nio.c
 
@@ -50,7 +52,7 @@ server: $(SERVER_BIN)
 $(BUILD_DIR) $(BIN_DIR):
 	mkdir -p $@
 
-$(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request $(BUILD_DIR)/src/logging:
+$(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request $(BUILD_DIR)/src/logging $(BUILD_DIR)/src/auth:
 	mkdir -p $@
 
 # Compilar servidor

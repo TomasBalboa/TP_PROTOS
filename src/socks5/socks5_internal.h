@@ -22,6 +22,8 @@
 enum socks_v5state {
     HELLO_READ,
     HELLO_WRITE,
+    AUTH_READ,
+    AUTH_WRITE,
     REQUEST_READ,
     REQUEST_RESOLVING,
     REQUEST_CONNECTING,
@@ -41,6 +43,11 @@ struct hello_st {
     struct hello_parser   parser;
     /** el método de autenticación seleccionado */
     uint8_t               method;
+};
+
+struct auth_st {
+    buffer             *rb, *wb;
+    struct auth_parser   parser;
 };
 
 /** usado por REQUEST_READ, REQUEST_RESOLVING, REQUEST_CONNECTING, REQUEST_WRITE */
@@ -89,9 +96,11 @@ struct client_info {
     /** Estados específicos del cliente */
     union {
         struct hello_st     hello;
+        struct auth_st      auth;       // AGREGAR
         struct request_st   request;
     } client;
     
+    uint8_t selected_method; 
     /** Buffers para comunicación bidireccional */
     uint8_t                 buff_client[BUFFER], buff_origin[BUFFER];
     buffer                  client_buffer, origin_buffer;
@@ -107,10 +116,8 @@ struct client_info {
     
     /** Selector */
     fd_selector             selector;
-    
     /** Flags */
     bool                    is_closed, is_admin, access_registered;
-    
     /** Username para autenticación */
     char                    username[65];
 };

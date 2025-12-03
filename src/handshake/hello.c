@@ -17,31 +17,40 @@ void hello_read_init(const unsigned state, struct selector_key *key) {
     hello_parser_init(&d->parser);
 }
 
-static unsigned hello_process(const struct hello_st* d) {
+
+static unsigned hello_process(struct selector_key *key, const struct hello_st* d) {
     unsigned ret = HELLO_WRITE;
+    uint8_t method = SOCKS5_AUTH_NO_ACCEPTABLE;
 
-    uint8_t method = SOCKS5_AUTH_NO_AUTH;
-
-    bool found = false;
+    // Preferencia 1: No auth
     for (uint8_t i = 0; i < d->parser.nmethods; i++) {
         if (d->parser.methods[i] == SOCKS5_AUTH_NO_AUTH) {
-            found = true;
+            method = SOCKS5_AUTH_NO_AUTH;
             break;
         }
     }
 
-    if (!found) {
-        method = SOCKS5_AUTH_NO_ACCEPTABLE;
-        ret = ERROR;
+    // Preferencia 2: User/Pass si NO_AUTH no está disponible
+    if (method == SOCKS5_AUTH_NO_ACCEPTABLE) {
+        for (uint8_t i = 0; i < d->parser.nmethods; i++) {
+            if (d->parser.methods[i] == SOCKS5_AUTH_USER_PASS) {
+                method = SOCKS5_AUTH_USER_PASS;
+                break;
+            }
+        }
     }
 
-    if (-1 == hello_marshall(d->wb, method)) {
+    if (method == SOCKS5_AUTH_NO_ACCEPTABLE) {
         ret = ERROR;
+    } else if (-1 == hello_marshall(d->wb, method)) {
+        ret = ERROR;
+    } else {
+        // Guardar método seleccionado para uso en hello_write()
+        ATTACHMENT(key)->selected_method = method;
     }
 
     return ret;
 }
-
 unsigned hello_read(struct selector_key *key) {
     struct hello_st *d = &ATTACHMENT(key)->client.hello;
     unsigned  ret      = HELLO_READ;
@@ -57,7 +66,7 @@ unsigned hello_read(struct selector_key *key) {
         const enum hello_state st = hello_consume(d->rb, &d->parser, &error);
         if(hello_is_done(st, 0)) {
             if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
-                ret = hello_process(d);
+                ret = hello_process(key, d);
             } else {
                 ret = ERROR;
             }
@@ -77,10 +86,11 @@ void hello_read_close(const unsigned state, struct selector_key *key) {
 
 unsigned hello_write(struct selector_key *key) {
     struct hello_st *d = &ATTACHMENT(key)->client.hello;
-    unsigned  ret      = HELLO_WRITE;
-    uint8_t  *ptr;
-    size_t    count;
-    ssize_t   n;
+    struct client_info *client = ATTACHMENT(key);
+    unsigned ret = HELLO_WRITE;
+    uint8_t *ptr;
+    size_t count;
+    ssize_t n;
 
     ptr = buffer_read_ptr(d->wb, &count);
     n = send(key->fd, ptr, count, MSG_NOSIGNAL);
@@ -89,8 +99,23 @@ unsigned hello_write(struct selector_key *key) {
     } else {
         buffer_read_adv(d->wb, n);
         if(!buffer_can_read(d->wb)) {
-            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
-                ret = REQUEST_READ;
+            // DECISIÓN: ¿Autenticación requerida?
+            uint8_t method = client->selected_method;
+            
+            if(method == SOCKS5_AUTH_USER_PASS) {
+                // Necesita autenticación
+                if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
+                    ret = AUTH_READ;  // <-- CAMBIO: Ir a AUTH_READ
+                } else {
+                    ret = ERROR;
+                }
+            } else if(method == SOCKS5_AUTH_NO_AUTH) {
+                // Sin autenticación
+                if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
+                    ret = REQUEST_READ;  // <-- CAMBIO: Ir a REQUEST_READ
+                } else {
+                    ret = ERROR;
+                }
             } else {
                 ret = ERROR;
             }

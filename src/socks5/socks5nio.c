@@ -10,7 +10,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
-
+#include "auth.h"
 #include "socks5nio.h"
 #include "socks5_internal.h"
 #include "buffer.h"
@@ -218,6 +218,16 @@ static const struct state_definition client_statbl[] = {
     {
         .state            = HELLO_WRITE,
         .on_write_ready   = hello_write,
+    },
+    {
+        .state            = AUTH_READ,
+        .on_arrival       = auth_read_init,
+        .on_departure     = auth_read_close,
+        .on_read_ready    = auth_read,
+    },
+    {
+        .state            = AUTH_WRITE,
+        .on_write_ready   = auth_write,
     },
     {
         .state            = REQUEST_READ,
