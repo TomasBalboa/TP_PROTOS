@@ -13,22 +13,22 @@ BIN_DIR  = bin
 
 # Archivos fuente
 COMMON_SRC = $(SRC_DIR)/buffer.c \
-             $(SRC_DIR)/selector.c \
-             $(SRC_DIR)/parser.c \
-             $(SRC_DIR)/parser_utils.c \
-             $(SRC_DIR)/stm.c \
-             $(SRC_DIR)/netutils.c \
-             $(SRC_DIR)/resolver_pool.c \
-			 $(SRC_DIR)/logging/logging.c
+	$(SRC_DIR)/selector.c \
+	$(SRC_DIR)/parser.c \
+	$(SRC_DIR)/parser_utils.c \
+	$(SRC_DIR)/stm.c \
+	$(SRC_DIR)/netutils.c \
+	$(SRC_DIR)/resolver_pool.c \
+	$(SRC_DIR)/logging/logging.c
 
 SOCKS5_SRC = $(SRC_DIR)/handshake/hello_parser.c \
-             $(SRC_DIR)/handshake/hello.c \
-             $(SRC_DIR)/auth/auth_parser.c \          
-             $(SRC_DIR)/auth/auth.c \                
-             $(SRC_DIR)/request/request_parser.c \
-             $(SRC_DIR)/socks5/request_handler.c \
-             $(SRC_DIR)/copy.c \
-             $(SRC_DIR)/socks5/socks5nio.c
+	$(SRC_DIR)/handshake/hello.c \
+	$(SRC_DIR)/auth/auth_parser.c \
+	$(SRC_DIR)/auth/auth.c \
+	$(SRC_DIR)/request/request_parser.c \
+	$(SRC_DIR)/socks5/request_handler.c \
+	$(SRC_DIR)/copy.c \
+	$(SRC_DIR)/socks5/socks5nio.c
 
 SERVER_SRC = $(SRC_DIR)/main.c \
              args.c \
@@ -61,7 +61,7 @@ $(SERVER_BIN): $(SERVER_OBJ) | $(BIN_DIR)
 	@echo "✓ Servidor compilado: $@"
 
 # Regla genérica para objetos
-$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR) $(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request $(BUILD_DIR)/src/logging
+$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR) $(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request $(BUILD_DIR)/src/logging $(BUILD_DIR)/src/auth
 	$(CC) $(CFLAGS) -I$(INC_DIR) -I$(SRC_DIR)/socks5 -c $< -o $@
 
 # Limpiar

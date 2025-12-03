@@ -10,6 +10,7 @@
 #include "buffer.h"
 #include "stm.h"
 #include "hello_parser.h"
+#include "auth_parser.h"
 #include "request.h"
 #include "copy.h"
 #include "resolver_pool.h"

@@ -4,7 +4,7 @@
 #include "netutils.h"
 #include "auth.h"
 #include "auth_parser.h"
-
+#include <string.h>
 // Forward declaration
 static unsigned auth_process(struct selector_key *key, const struct auth_st *d);
 
@@ -51,17 +51,38 @@ void auth_read_close(const unsigned state, struct selector_key *key) {
     auth_parser_close(&d->parser);
 }
 
+unsigned auth_write(struct selector_key *key) {
+    struct auth_st *d = &ATTACHMENT(key)->client.auth;
+    unsigned ret = AUTH_WRITE;
+    uint8_t *ptr;
+    size_t count;
+    ssize_t n;
+
+    ptr = buffer_read_ptr(d->wb, &count);
+    n = send(key->fd, ptr, count, MSG_NOSIGNAL);
+    if (n == -1) {
+        ret = ERROR;
+    } else {
+        buffer_read_adv(d->wb, n);
+        if (!buffer_can_read(d->wb)) {
+            if (SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
+                ret = REQUEST_READ;  // Pasar al siguiente estado
+            } else {
+                ret = ERROR;
+            }
+        }
+    }
+
+    return ret;
+}
 
 /**
  * Valida las credenciales y prepara la respuesta.
  * TODO: Integrar con base de datos de usuarios.
  */
+
 static unsigned auth_process(struct selector_key *key, const struct auth_st *d) {
-    // ADAPT: Reemplazar con tu lógica de validación
-    // Opciones:
-    // 1. Llamar users_login() si existe
-    // 2. Validar contra hardcoded
-    // 3. Conectar a BD externa
+
     
     bool auth_ok = false;
     

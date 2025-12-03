@@ -44,7 +44,7 @@ static const unsigned max_pool  = 50;
 static pthread_mutex_t pool_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /** Forward declaration de la tabla de estados */
-static const struct state_definition client_statbl[9];
+static const struct state_definition client_statbl[11];
 
 /** crea un nuevo objeto socks5 */
 static struct client_info * socks5_new(int client_fd) {
