@@ -61,6 +61,8 @@ main(const int argc, const char **argv) {
     // no tenemos nada que leer de stdin
     close(0);
 
+    int server = -1;
+
     const char       *err_msg = NULL;
     selector_status   ss      = SELECTOR_SUCCESS;
     fd_selector selector      = NULL;
@@ -94,14 +96,14 @@ main(const int argc, const char **argv) {
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port        = htons(port);
 
-    const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+     server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(server < 0) {
         err_msg = "unable to create socket";
         goto finally;
     }
 
     fprintf(stdout, "Listening on TCP port %d\n", port);
-    logf(OUTPUT,"Escuchando puerto TCP %d\n", port);
+    logf(OUTPUT, "Escuchando puerto TCP %d", port);
 
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));

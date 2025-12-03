@@ -1,4 +1,4 @@
-#infndef __METRICS_H__
+#ifndef __METRICS_H__
 #define __METRICS_H__
 
 #endif

@@ -76,7 +76,7 @@ static inline void makeBufferSpace(size_t len) {
  * This is performed with nonblocking writes. If any bytes are left for writing, we tell the
  * selector to notify us when writing is available and retry once that happens.
  */
-static inline void tryFlushBufferToFile() {
+static inline void tryFlushBufferToFile(void) {
     // Try to write everything we have in the buffer. This is nonblocking, so any
     // (or all) remaining bytes will be saved in the buffer and retried later.
     ssize_t written = write(logFileFd, buffer + bufferStart, bufferLength);
@@ -180,7 +180,7 @@ int loggerInit(fd_selector selectorParam, const char* logFile, FILE* logStreamPa
     return 0;
 }
 
-int loggerFinalize() {
+int loggerFinalize(void) {
     // If a logging file is opened, flush buffers, unregister it, and close it.
     if (logFileFd >= 0) {
         selector_unregister_fd(selector, logFileFd); // This will also call the TFdHandler's close, and close the file.
@@ -209,7 +209,7 @@ int loggerIsEnabledFor(TLogLevel level) {
     return level >= logLevel && (logFileFd > 0 || logStream != NULL);
 }
 
-void loggerPrePrint() {
+void loggerPrePrint(void) {
     makeBufferSpace(LOG_BUFFER_MAX_PRINT_LENGTH);
 }
 
