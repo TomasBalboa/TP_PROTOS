@@ -18,7 +18,8 @@ COMMON_SRC = $(SRC_DIR)/buffer.c \
              $(SRC_DIR)/parser_utils.c \
              $(SRC_DIR)/stm.c \
              $(SRC_DIR)/netutils.c \
-             $(SRC_DIR)/resolver_pool.c
+             $(SRC_DIR)/resolver_pool.c \
+			 $(SRC_DIR)/logging/logging.c
 
 SOCKS5_SRC = $(SRC_DIR)/handshake/hello_parser.c \
              $(SRC_DIR)/handshake/hello.c \
@@ -49,7 +50,7 @@ server: $(SERVER_BIN)
 $(BUILD_DIR) $(BIN_DIR):
 	mkdir -p $@
 
-$(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request:
+$(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request $(BUILD_DIR)/src/logging:
 	mkdir -p $@
 
 # Compilar servidor
@@ -58,7 +59,7 @@ $(SERVER_BIN): $(SERVER_OBJ) | $(BIN_DIR)
 	@echo "✓ Servidor compilado: $@"
 
 # Regla genérica para objetos
-$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR) $(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request
+$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR) $(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request $(BUILD_DIR)/src/logging
 	$(CC) $(CFLAGS) -I$(INC_DIR) -I$(SRC_DIR)/socks5 -c $< -o $@
 
 # Limpiar

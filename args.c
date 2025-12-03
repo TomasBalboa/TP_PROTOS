@@ -4,6 +4,7 @@
 #include <string.h>    /* memset */
 #include <errno.h>
 #include <getopt.h>
+#include "./src/include/logging.h"
 
 #include "args.h"
 

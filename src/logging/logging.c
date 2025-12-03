@@ -1,7 +1,7 @@
 #include "../include/logging.h"
 
-#define LOG_DIR "./log"
-#define DEFAULT_LOG_FILE (DEFAULT_LOG_FOLDER "/%02d-%02d-%04d.log")
+#define DEFAULT_LOG_DIR "./log"
+#define DEFAULT_LOG_FILE (DEFAULT_LOG_DIR "/%02d-%02d-%04d.log")
 #define DEFAULT_LOG_FILE_MAXSTRLEN 48
 
 /** The minimum allowed length for the log writing buffer. */
@@ -14,13 +14,13 @@
 #define LOG_BUFFER_MAX_PRINT_LENGTH 0x200 // 512 bytes
 
 #define LOG_FILE_PERMISSION_BITS 666
-#define LOG_FOLDER_PERMISSION_BITS 666
+#define LOG_DIR_PERMISSION_BITS 666
 #define LOG_FILE_OPEN_FLAGS (O_WRONLY | O_APPEND | O_CREAT | O_NONBLOCK)
 
-static const char* levels[] = {"[DEBUG]", "[INFO]","[WARNING]","[ERROR]"};
+static const char* levels[] = {"[DEBUG]", "[INFO]","[OUTPUT]","[WARNING]","[ERROR]"};
 
-const char* loggerGetLevel(TLogLevel){
-    return levels[TLogLevel];
+const char* loggerGetLevel(TLogLevel level){
+    return levels[level];
 }
 
 #ifndef DISABLE_LOGGER
@@ -91,10 +91,12 @@ static inline void tryFlushBufferToFile() {
 }
 
 static void fdWriteHandler(selector_key_t* key) {
+    (void) key;
     tryFlushBufferToFile();
 }
 
 static void fdCloseHandler(selector_key_t* key) {
+    (void) key;
     // We will attempt to flush the remaining bytes to the log file and then close it.
 
     if (bufferLength != 0) {
@@ -113,7 +115,7 @@ static void fdCloseHandler(selector_key_t* key) {
     logFileFd = -1;
 }
 
-static TFdHandler fdHandler = {
+static fd_handler fdHandler = {
     .handle_read = NULL,
     .handle_write = fdWriteHandler,
     .handle_close = fdCloseHandler,
@@ -134,7 +136,7 @@ static int tryOpenLogfile(const char* logFile, struct tm tm) {
         logFile = logfilebuf;
 
         // If the default log folder isn't created, create it.
-        mkdir(DEFAULT_LOG_FOLDER, LOG_FOLDER_PERMISSION_BITS);
+        mkdir(DEFAULT_LOG_DIR, LOG_DIR_PERMISSION_BITS);
     }
 
     // Warning: If a custom logFile is specified and it is within uncreated folders, this open will fail.

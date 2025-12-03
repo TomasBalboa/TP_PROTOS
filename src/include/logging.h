@@ -9,16 +9,22 @@
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 typedef enum {
     DEBUG = 0,
     INFO,
+    OUTPUT,
     WARNING,
     ERROR
 } TLogLevel;
 
-#define MIN_LOG_LEVEL DEBUG;
-#define MAX_LOG_LEVEL ERROR;
+#define MIN_LOG_LEVEL DEBUG
+#define MAX_LOG_LEVEL ERROR
 
 const char* loggerGetLevel(TLogLevel);
 
@@ -59,7 +65,7 @@ int loggerPostPrint(int written, size_t maxlen);
         int loginternal_written = snprintf(loginternal_bufstart, loginternal_maxlen, "%04d-%02d-%02dT%02d:%02d:%02d%s\t" format "\n", \
                                            loginternal_tm.tm_year + 1900, loginternal_tm.tm_mon + 1, loginternal_tm.tm_mday,          \
                                            loginternal_tm.tm_hour, loginternal_tm.tm_min, loginternal_tm.tm_sec,                      \
-                                           level == LOG_OUTPUT ? "" : loggerGetLevelString(level), ##__VA_ARGS__);                      \
+                                           level == OUTPUT ? "" : loggerGetLevel(level), ##__VA_ARGS__);                      \
         loggerPostPrint(loginternal_written, loginternal_maxlen);                                                                     \
     }
 

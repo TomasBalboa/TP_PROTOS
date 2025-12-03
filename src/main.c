@@ -26,6 +26,7 @@
 #include "selector.h"
 #include "socks5nio.h"
 #include "resolver_pool.h"
+#include "./include/logging.h"
 
 static bool done = false;
 
@@ -63,6 +64,29 @@ main(const int argc, const char **argv) {
     const char       *err_msg = NULL;
     selector_status   ss      = SELECTOR_SUCCESS;
     fd_selector selector      = NULL;
+    const struct selector_init conf = {
+        .signal = SIGALRM,
+        .select_timeout = {
+            .tv_sec  = 10,
+            .tv_nsec = 0,
+        },
+    };
+    if(0 != selector_init(&conf)) {
+        err_msg = "initializing selector";
+        goto finally;
+    }
+
+    // Inicializar thread pool de resolución DNS
+    resolver_pool_init();
+
+    selector = selector_new(1024);
+    if(selector == NULL) {
+        err_msg = "unable to create selector";
+        goto finally;
+    }
+
+    loggerInit(selector,"",stdout);
+    loggerSetLevel(OUTPUT);
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -77,6 +101,7 @@ main(const int argc, const char **argv) {
     }
 
     fprintf(stdout, "Listening on TCP port %d\n", port);
+    logf(OUTPUT,"Escuchando puerto TCP %d\n", port);
 
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
@@ -100,26 +125,7 @@ main(const int argc, const char **argv) {
         err_msg = "getting server socket flags";
         goto finally;
     }
-    const struct selector_init conf = {
-        .signal = SIGALRM,
-        .select_timeout = {
-            .tv_sec  = 10,
-            .tv_nsec = 0,
-        },
-    };
-    if(0 != selector_init(&conf)) {
-        err_msg = "initializing selector";
-        goto finally;
-    }
-
-    // Inicializar thread pool de resolución DNS
-    resolver_pool_init();
-
-    selector = selector_new(1024);
-    if(selector == NULL) {
-        err_msg = "unable to create selector";
-        goto finally;
-    }
+    
     const struct fd_handler socksv5 = {
         .handle_read       = socksv5_passive_accept,
         .handle_write      = NULL,
@@ -145,6 +151,7 @@ main(const int argc, const char **argv) {
 
     int ret = 0;
 finally:
+    loggerFinalize();
     if(ss != SELECTOR_SUCCESS) {
         fprintf(stderr, "%s: %s\n", (err_msg == NULL) ? "": err_msg,
                                   ss == SELECTOR_IO
