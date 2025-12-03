@@ -245,9 +245,6 @@ unsigned request_resolving_block_ready(struct selector_key *key) {
     free(job);
     s->pending_resolution = NULL;
     
-    /* Liberar referencia del worker */
-    socks5_destroy(job->socks5_ref);
-    
     return ret;
 }
 

@@ -110,20 +110,30 @@ static void socks5_destroy_(struct client_info* s) {
  * y el pool de objetos.
  */
 void socks5_destroy(struct client_info *s) {
-    if(s == NULL) {
+    if (s == NULL) {
         return;
     }
-    
+
     pthread_mutex_lock(&s->ref_mutex);
+
+    /* Protección ante dobles destroys o refs ya en 0 */
+    if (s->references <= 0) {
+        pthread_mutex_unlock(&s->ref_mutex);
+        return;
+    }
+
     s->references--;
-    int refs = s->references;
+    const int refs = s->references;
+
     pthread_mutex_unlock(&s->ref_mutex);
-    
-    if(refs == 0) {
-        /* Última referencia - destruir mutex interno */
+
+    if (refs == 0) {
+        /* Última referencia: ya nadie debe volver a usar `s` */
+
         pthread_mutex_destroy(&s->ref_mutex);
+
         pthread_mutex_lock(&pool_mutex);
-        if(pool_size < max_pool) {
+        if (pool_size < max_pool) {
             s->next = pool;
             pool    = s;
             pool_size++;
