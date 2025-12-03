@@ -7,6 +7,7 @@
 # Directorios de build
 build/
 bin/
+log/
 
 # Archivos de depuración
 *.dSYM/
