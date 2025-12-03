@@ -1,83 +1,59 @@
 # Makefile para el servidor SOCKS5
 # TP Protocolos de Comunicación 2025/2
 
-CC       = gcc
-CFLAGS   = -std=c11 -Wall -Werror -Wextra -pedantic -D_POSIX_C_SOURCE=200809L -g -D_GNU_SOURCE
-LDFLAGS  = -pthread
+include Makefile.inc
 
 # Directorios
 SRC_DIR  = src
 INC_DIR  = $(SRC_DIR)/include
-BUILD_DIR = build
+OBJ_DIR = build
 BIN_DIR  = bin
 
 # Archivos fuente
-COMMON_SRC = $(SRC_DIR)/buffer.c \
-	$(SRC_DIR)/selector.c \
-	$(SRC_DIR)/parser.c \
-	$(SRC_DIR)/parser_utils.c \
-	$(SRC_DIR)/stm.c \
-	$(SRC_DIR)/netutils.c \
-	$(SRC_DIR)/resolver_pool.c \
-	$(SRC_DIR)/logging/logging.c
-
-SOCKS5_SRC = $(SRC_DIR)/handshake/hello_parser.c \
-	$(SRC_DIR)/handshake/hello.c \
-	$(SRC_DIR)/auth/auth_parser.c \
-	$(SRC_DIR)/auth/auth.c \
-	$(SRC_DIR)/request/request_parser.c \
-	$(SRC_DIR)/socks5/request_handler.c \
-	$(SRC_DIR)/copy.c \
-	$(SRC_DIR)/socks5/socks5nio.c
-
-SERVER_SRC = $(SRC_DIR)/main.c \
-             args.c \
-             $(COMMON_SRC) \
-             $(SOCKS5_SRC)
+COMMON_SRC = $(wildcard $(SRC_DIR)/*.c)
+METRICS_SRC = $(wildcard $(SRC_DIR)/logging/*.c) 
+HELLO_SRC = $(wildcard $(SRC_DIR)/handshake/*.c)
+SOCKS5_SRC = $(wildcard $(SRC_DIR)/socks5/*.c)
+REQUEST_SRC = $(wildcard $(SRC_DIR)/request/*.c)
+AUTH_SRC = $(wildcard $(SRC_DIR)/auth/*.c)
 
 # Objetos
-SERVER_OBJ = $(SERVER_SRC:%.c=$(BUILD_DIR)/%.o)
+COMMON_OBJ = $(COMMON_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+METRICS_OBJ = $(METRICS_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+HELLO_OBJ = $(HELLO_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+SOCKS5_OBJ = $(SOCKS5_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+REQUEST_OBJ = $(REQUEST_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+AUTH_OBJ = $(AUTH_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+
+# Todos los objetos
+ALL_OBJ = $(COMMON_OBJ) $(METRICS_OBJ) $(HELLO_OBJ) $(SOCKS5_OBJ) $(REQUEST_OBJ) $(AUTH_OBJ)
 
 # Binarios
 SERVER_BIN = $(BIN_DIR)/socks5d
 
 # Targets principales
-.PHONY: all clean server test
+.PHONY: all clean help
 
-all: server
-
-server: $(SERVER_BIN)
-
-# Crear directorios si no existen
-$(BUILD_DIR) $(BIN_DIR):
-	mkdir -p $@
-
-$(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request $(BUILD_DIR)/src/logging $(BUILD_DIR)/src/auth:
-	mkdir -p $@
-
-# Compilar servidor
-$(SERVER_BIN): $(SERVER_OBJ) | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-	@echo "✓ Servidor compilado: $@"
-
-# Regla genérica para objetos
-$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR) $(BUILD_DIR)/src $(BUILD_DIR)/src/socks5 $(BUILD_DIR)/src/handshake $(BUILD_DIR)/src/request $(BUILD_DIR)/src/logging $(BUILD_DIR)/src/auth
-	$(CC) $(CFLAGS) -I$(INC_DIR) -I$(SRC_DIR)/socks5 -c $< -o $@
+all: $(SERVER_BIN)
 
 # Limpiar
 clean:
-	rm -rf $(BUILD_DIR) $(BIN_DIR)
-	@echo "✓ Archivos de compilación eliminados"
-
-# Tests (para más adelante)
-test:
-	@echo "Tests no implementados aún"
+	rm -rf $(OBJ_DIR) $(BIN_DIR)
+	@echo "Todo limpio o7"
 
 # Ayuda
 help:
 	@echo "Targets disponibles:"
 	@echo "  make          - Compila el servidor"
-	@echo "  make server   - Compila el servidor"
+	@echo "  make all      - Compila el servidor"
 	@echo "  make clean    - Elimina archivos de compilación"
-	@echo "  make test     - Ejecuta tests (TODO)"
 	@echo "  make help     - Muestra esta ayuda"
+
+# Crear directorios si no existen
+$(SERVER_BIN): $(ALL_OBJ)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(ALL_OBJ) -o $(SERVER_BIN)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -I$(INC_DIR) -c $< -o $@

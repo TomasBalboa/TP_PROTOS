@@ -5,9 +5,9 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "copy.h"
-#include "socks5_internal.h"
-#include "socks5nio.h"
+#include "./include/copy.h"
+#include "./include/socks5_internal.h"
+#include "./include/socks5nio.h"
 
 // static fd_interest copy_compute_interests(fd_selector s, struct copy *d);
 static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer);
