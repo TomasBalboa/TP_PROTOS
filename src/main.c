@@ -88,7 +88,7 @@ main(const int argc, const char **argv) {
     }
 
     loggerInit(selector,"",stdout);
-    loggerSetLevel(OUTPUT);
+    loggerSetLevel(LOG_OUTPUT);
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -103,7 +103,7 @@ main(const int argc, const char **argv) {
     }
 
     fprintf(stdout, "Listening on TCP port %d\n", port);
-    logf(OUTPUT, "Escuchando puerto TCP %d", port);
+    logf(LOG_OUTPUT, "Escuchando puerto TCP %d", port);
 
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));

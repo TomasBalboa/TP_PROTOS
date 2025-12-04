@@ -142,7 +142,7 @@ static int tryOpenLogfile(const char* logFile, struct tm tm) {
     // Warning: If a custom logFile is specified and it is within uncreated folders, this open will fail.
     int fd = open(logFile, LOG_FILE_OPEN_FLAGS, LOG_FILE_PERMISSION_BITS);
     if (fd < 0) {
-        fprintf(stderr, "WARNING: Failed to open logging file at %s. The server will still run, but with logging disabled.\n", logFile);
+        fprintf(stderr, "LOG_WARNING: Failed to open logging file at %s. The server will still run, but with logging disabled.\n", logFile);
         return -1;
     }
 
@@ -172,7 +172,7 @@ int loggerInit(fd_selector selectorParam, const char* logFile, FILE* logStreamPa
         if (buffer == NULL) {
             close(logFileFd);
             logFileFd = -1;
-            fprintf(stderr, "WARNING: Failed to malloc a buffer for logging. You don't have 4KBs?\n");
+            fprintf(stderr, "LOG_WARNING: Failed to malloc a buffer for logging. You don't have 4KBs?\n");
             return -1;
         }
     }

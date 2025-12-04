@@ -11,6 +11,7 @@
 
 #include "resolver_pool.h"
 #include "selector.h"
+#include "metrics.h"
 
 #define MAX_WORKERS 10
 #define JOB_QUEUE_SIZE 100
@@ -66,7 +67,7 @@ resolver_worker(void *arg) {
         
         pthread_cond_signal(&job_queue.not_full);
         pthread_mutex_unlock(&job_queue.mutex);
-        
+        metrics_query_dns();
         // Ejecutar resolución DNS (BLOQUEANTE - pero en thread separado)
         job->error_code = getaddrinfo(job->hostname, job->port, 
                                       &job->hints, &job->result);

@@ -8,10 +8,12 @@
 #include "./include/copy.h"
 #include "./include/socks5_internal.h"
 #include "./include/socks5nio.h"
+#include "./include/metrics.h"
+#include "./include/logging.h"
 
 // static fd_interest copy_compute_interests(fd_selector s, struct copy *d);
 static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer);
-static unsigned write_aux(struct selector_key *key, buffer *buffer);
+static unsigned write_aux(struct selector_key *key, buffer *buffer, bool is_client);
 
 /**
  * Computa los intereses del selector para un fd basado en el estado de los buffers
@@ -76,9 +78,9 @@ unsigned copy_write(struct selector_key *key) {
     struct client_info *s = ATTACHMENT(key);
 
     if (key->fd == s->client_fd) {
-        return write_aux(key,&s->client_buffer);
+        return write_aux(key,&s->client_buffer,true);
     } else if (key->fd == s->origin_fd) {
-        return write_aux(key,&s->origin_buffer);
+        return write_aux(key,&s->origin_buffer,false);
     }
     return ERROR;
 }
@@ -105,7 +107,6 @@ static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer){
 
     if(bytes_written > 0){
         buffer_read_adv(buffer, bytes_written);
-        // metrica
     }
 
     if(buffer_can_read(buffer) || (bytes_written < 0 && errno == EWOULDBLOCK)){
@@ -116,7 +117,7 @@ static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer){
     return COPY;
 }
 
-static unsigned write_aux(struct selector_key *key, buffer *buffer){
+static unsigned write_aux(struct selector_key *key, buffer *buffer, bool is_client){
     if(!buffer_can_read(buffer)){
         return COPY;
     }
@@ -130,7 +131,12 @@ static unsigned write_aux(struct selector_key *key, buffer *buffer){
         return ERROR;
     }
 
-    // metrica
+    logf(LOG_DEBUG,"write_aux (copy.c): se envió %ld bytes de los %lu que pudo mandar",bytes_written,available_space);
+    if(is_client){
+        metrics_update(0,bytes_written);
+    }else{
+        metrics_update(bytes_written,0);
+    }
 
     buffer_read_adv(buffer, bytes_written);
 

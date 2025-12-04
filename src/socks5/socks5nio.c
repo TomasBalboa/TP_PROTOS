@@ -118,7 +118,7 @@ void socks5_destroy(struct client_info *s) {
     }
 
     pthread_mutex_lock(&s->ref_mutex);
-
+    metrics_logout();
     /* Protección ante dobles destroys o refs ya en 0 */
     if (s->references <= 0) {
         pthread_mutex_unlock(&s->ref_mutex);
@@ -184,11 +184,11 @@ socksv5_passive_accept(struct selector_key *key) {
 
     const int client = accept(key->fd, (struct sockaddr*) &client_addr, &client_addr_len);
     if(client == -1) {
-        log(WARNING, "socksv5_passive_accept (socks5nio.c): accept() retornó -1");
+        log(LOG_WARNING, "socksv5_passive_accept (socks5nio.c): accept() retornó -1");
         goto fail;
     }
     if(selector_fd_set_nio(client) == -1) {
-        log(ERROR, "socksv5_passive_accept (socks5nio.c): falló selector_fd_set_nio");
+        log(LOG_ERROR, "socksv5_passive_accept (socks5nio.c): falló selector_fd_set_nio");
         goto fail;
     }
 
@@ -198,7 +198,7 @@ socksv5_passive_accept(struct selector_key *key) {
         // sin un estado, nos es imposible manejaro.
         // tal vez deberiamos apagar accept() hasta que detectemos
         // que se liberó alguna conexión.
-        log(ERROR, "socksv5_passive_accept (socks5nio.c): falló socks5_new");
+        log(LOG_ERROR, "socksv5_passive_accept (socks5nio.c): falló socks5_new");
         goto fail;
     }
     memcpy(&state->client_addr, &client_addr, client_addr_len);
@@ -206,12 +206,12 @@ socksv5_passive_accept(struct selector_key *key) {
 
     selector_status ans = selector_register(key->s, client, &socks5_handler, OP_READ, state);
     if(SELECTOR_SUCCESS != ans) {
-        logf(WARNING, "socksv5_passive_accept (socks5nio.c): selector_register falló (%s)", selector_error(ans));
+        logf(LOG_WARNING, "socksv5_passive_accept (socks5nio.c): selector_register falló (%s)", selector_error(ans));
         goto fail;
     }
     
     metrics_login();
-    logf(INFO, "socksv5_passive_accept (socks5nio.c): nuevo cliente (address: %s, socket: %d)", printSocketAddress((struct sockaddr*)&client_addr), client);
+    logf(LOG_INFO, "socksv5_passive_accept (socks5nio.c): nuevo cliente (address: %s, socket: %d)", print_socket_address((struct sockaddr*)&client_addr), client);
     return ;
 fail:
     if(client != -1) {

@@ -16,15 +16,15 @@
 #include <errno.h>
 
 typedef enum {
-    DEBUG = 0,
-    INFO,
-    OUTPUT,
-    WARNING,
-    ERROR
+    LOG_DEBUG = 0,
+    LOG_INFO,
+    LOG_OUTPUT,
+    LOG_WARNING,
+    LOG_ERROR
 } TLogLevel;
 
-#define MIN_LOG_LEVEL DEBUG
-#define MAX_LOG_LEVEL ERROR
+#define MIN_LOG_LEVEL LOG_DEBUG
+#define MAX_LOG_LEVEL LOG_ERROR
 
 const char* loggerGetLevel(TLogLevel);
 
@@ -66,7 +66,7 @@ int loggerPostPrint(int written, size_t maxlen);
                                            "%04d-%02d-%02dT%02d:%02d:%02d%s\t" fmt "\n",                               \
                                            loginternal_tm.tm_year + 1900, loginternal_tm.tm_mon + 1, loginternal_tm.tm_mday, \
                                            loginternal_tm.tm_hour, loginternal_tm.tm_min, loginternal_tm.tm_sec,     \
-                                           level == OUTPUT ? "" : loggerGetLevel(level), __VA_ARGS__);                \
+                                           level == LOG_OUTPUT ? "" : loggerGetLevel(level), __VA_ARGS__);                \
         loggerPostPrint(loginternal_written, loginternal_maxlen);                                                      \
     }
 
