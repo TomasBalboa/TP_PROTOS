@@ -18,19 +18,19 @@ typedef struct {
 /**
  * @brief Setea el contador de estadísticas
  */
-void metricsInit();
+void metricsInit(void);
 
 /**
  * @brief Registra que se generó una nueva conexión: 
  * total_connections++, current_connections++, max_connections = ( current_connections > max_connections ) ? current_connections : max_connections
  */
-void metrics_login();
+void metrics_login(void);
 
 /**
  * @brief Registra que se cerró una sesión:
  * current_connections--
  */
-void metrics_logout();
+void metrics_logout(void);
 
 /**
  * @brief Registra una transferencia de bytes:
@@ -49,12 +49,12 @@ void metrics_getter(metrics_t* metrics);
 /**
  * @brief Registra una query de DNS
  */
-void metrics_query_dns();
+void metrics_query_dns(void);
 
 /**
  * @brief Obtiene en segundos el tiempo de vida del servidor
  * @return El tiempo de vida del servidor en segundos
  */
-time_t metrics_get_uptime();
+time_t metrics_get_uptime(void);
 
 #endif

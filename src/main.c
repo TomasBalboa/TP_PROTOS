@@ -22,11 +22,13 @@
 #include <sys/socket.h>  // socket
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <arpa/inet.h>
 
 #include "selector.h"
 #include "socks5nio.h"
 #include "resolver_pool.h"
 #include "./include/logging.h"
+#include "../args.h"
 
 static bool done = false;
 
@@ -37,26 +39,9 @@ sigterm_handler(const int signal) {
 }
 
 int
-main(const int argc, const char **argv) {
-    unsigned port = 1080;
-
-    if(argc == 1) {
-        // utilizamos el default
-    } else if(argc == 2) {
-        char *end     = 0;
-        const long sl = strtol(argv[1], &end, 10);
-
-        if (end == argv[1]|| '\0' != *end 
-           || ((LONG_MIN == sl || LONG_MAX == sl) && ERANGE == errno)
-           || sl < 0 || sl > USHRT_MAX) {
-            fprintf(stderr, "port should be an integer: %s\n", argv[1]);
-            return 1;
-        }
-        port = sl;
-    } else {
-        fprintf(stderr, "Usage: %s <port>\n", argv[0]);
-        return 1;
-    }
+main(const int argc, char **argv) {
+    struct socks5args args;
+    parse_args(argc, argv, &args);
 
     // no tenemos nada que leer de stdin
     close(0);
@@ -93,8 +78,13 @@ main(const int argc, const char **argv) {
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family      = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port        = htons(port);
+    addr.sin_port        = htons(args.socks_port);
+    
+    // Convertir la dirección de string a formato de red
+    if(inet_pton(AF_INET, args.socks_addr, &addr.sin_addr) <= 0) {
+        err_msg = "invalid SOCKS address";
+        goto finally;
+    }
 
      server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(server < 0) {
@@ -102,8 +92,8 @@ main(const int argc, const char **argv) {
         goto finally;
     }
 
-    fprintf(stdout, "Listening on TCP port %d\n", port);
-    logf(LOG_OUTPUT, "Escuchando puerto TCP %d", port);
+    fprintf(stdout, "Listening on TCP port %d (address: %s)\n", args.socks_port, args.socks_addr);
+    logf(LOG_OUTPUT, "Escuchando puerto TCP %d en %s", args.socks_port, args.socks_addr);
 
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));

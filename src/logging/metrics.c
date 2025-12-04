@@ -2,18 +2,18 @@
 
 static metrics_t stats;
 
-void metricsInit(){
+void metricsInit(void){
     memset(&stats, 0, sizeof(stats));
     stats.uptime = time(NULL);
 }
 
-void metrics_login(){
+void metrics_login(void){
     stats.current_connections++;
     stats.total_connections++;
     stats.max_connections = ( stats.current_connections > stats.max_connections ) ? stats.current_connections : stats.max_connections;
 }
 
-void metrics_logout(){
+void metrics_logout(void){
     stats.current_connections --;
 }
 
@@ -28,10 +28,10 @@ void metrics_getter(metrics_t* metrics){
     }
 }
 
-void metrics_query_dns(){
+void metrics_query_dns(void){
     stats.dns_queries++;
 }
 
-time_t metrics_get_uptime(){
+time_t metrics_get_uptime(void){
     return time(NULL) - stats.uptime;
 }
