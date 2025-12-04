@@ -94,3 +94,55 @@ curl --socks5 admin:password123@127.0.0.1:1080 http://example.com
 ## Logs
 
 Los logs del servidor se guardan en el directorio `log/` con el formato `DD-MM-YYYY.log`.
+
+## Pruebas incluidas (auth + stress)
+
+En el directorio `tools/` hay dos utilidades para probar rápidamente el proxy:
+
+- `auth_test.sh` (smoke): envía un HELLO (SOCKS5) y una sub-negociación USER/PASS y muestra la respuesta en hex.
+- `stress_clients.py`: script Python `asyncio` para abrir N clientes concurrentes que ejecutan HELLO+AUTH y mantienen la conexión.
+
+Cómo prepararlas:
+
+1. Compilar servidor y dejarlo corriendo en otra terminal:
+
+```bash
+make all
+./bin/socks5d -p 9090
+```
+
+2. Hacer ejecutables los scripts (opcional, `make tools` intenta hacerlo):
+
+```bash
+make tools
+chmod +x tools/*.sh tools/*.py
+```
+
+3. Ejecutar el auth test:
+
+```bash
+ ./tools/auth_test.sh localhost 9090
+
+```
+
+Salida esperada (hex):
+
+```
+05020100
+```
+4. Ejecutar el stress test (concurrencia)
+
+```bash
+# Aumentar temporalmente el límite de ficheros si es necesario
+ulimit -n 10000
+
+python3 tools/stress_clients.py 500 127.0.0.1 9090 30
+```
+
+Salida esperada (cada cliente imprimirá la respuesta hex):
+
+```
+0 reply 05020100
+1 reply 05020100
+...
+```

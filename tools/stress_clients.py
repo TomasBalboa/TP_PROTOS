@@ -11,7 +11,6 @@
 #la primera prueba fue exitosa, logré abrir 500 conexiones concurrentes (se abrieron correctamente, no en orden)
 #la segunda falló, tuvimos un segmentation fault, por algún motivo cortó en 479
 #[HELLO] hello_write fd=479 wrote=2 bytes
-# mientras en otra terminal corro el servidor SOCKS5 (ej: ./bin/socks5d -p [portp] )
 #Pido ayuda a GPT
 
 import asyncio
