@@ -339,7 +339,6 @@ unsigned request_connecting_write(struct selector_key *key) {
         }
     }
     
-    /* Conexión exitosa - pasar a COPY */
     buffer_reset(&s->client_buffer);
     buffer_reset(&s->origin_buffer);
     
