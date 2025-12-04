@@ -10,6 +10,11 @@ OBJ_DIR = build
 BIN_DIR  = bin
 
 # Archivos fuente
+
+tools: 
+	@chmod +x tools/*.sh || true
+	@chmod +x tools/*.py || true
+
 COMMON_SRC = $(wildcard $(SRC_DIR)/*.c)
 METRICS_SRC = $(wildcard $(SRC_DIR)/logging/*.c) 
 HELLO_SRC = $(wildcard $(SRC_DIR)/handshake/*.c)
@@ -34,7 +39,7 @@ ALL_OBJ = $(COMMON_OBJ) $(METRICS_OBJ) $(HELLO_OBJ) $(SOCKS5_OBJ) $(REQUEST_OBJ)
 SERVER_BIN = $(BIN_DIR)/socks5d
 
 # Targets principales
-.PHONY: all clean help
+.PHONY: all clean help tools
 
 all: $(SERVER_BIN)
 

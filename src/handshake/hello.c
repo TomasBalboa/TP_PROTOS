@@ -4,7 +4,7 @@
 #include "netutils.h"
 #include "hello.h"
 #include "hello_parser.h"
-
+#include "logging.h"
 // Handlers de estado HELLO trasladados desde socks5nio.c
 
 void hello_read_init(const unsigned state, struct selector_key *key) {
@@ -15,6 +15,7 @@ void hello_read_init(const unsigned state, struct selector_key *key) {
     d->wb     = &(ATTACHMENT(key)->origin_buffer);
     d->method = SOCKS5_AUTH_NO_ACCEPTABLE;
     hello_parser_init(&d->parser);
+    logf(LOG_DEBUG, "[HELLO] hello_read_init fd=%d", key->fd);
 }
 
 
@@ -47,6 +48,7 @@ static unsigned hello_process(struct selector_key *key, const struct hello_st* d
     } else {
         // Guardar método seleccionado para uso en hello_write()
         ATTACHMENT(key)->selected_method = method;
+        logf(LOG_INFO, "[HELLO] selected method=%u for fd=%d", method, key->fd);
     }
 
     return ret;
@@ -97,6 +99,8 @@ unsigned hello_write(struct selector_key *key) {
     if(n == -1) {
         ret = ERROR;
     } else {
+        printf("[HELLO] hello_write fd=%d wrote=%zd bytes\n", key->fd, n);
+        fflush(stdout);
         buffer_read_adv(d->wb, n);
         if(!buffer_can_read(d->wb)) {
             // DECISIÓN: ¿Autenticación requerida?
