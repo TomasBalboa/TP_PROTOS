@@ -5,6 +5,7 @@
         "socks5_internal.h": "c",
         "stm.h": "c",
         "request_handler.h": "c",
-        "auth.h": "c"
+        "auth.h": "c",
+        "metrics.h": "c"
     }
 }

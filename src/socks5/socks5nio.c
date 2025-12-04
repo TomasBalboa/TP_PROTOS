@@ -19,13 +19,16 @@
 #include "copy.h"
 #include "hello.h"
 #include "request_handler.h"
+#include "logging.h"
+#include "metrics.h"
+#include "utils.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
 // Tamaño de buffers
 #define BUFFER_SIZE 4096
 
-///////////////////(...)::)::::::::::::::::D~~~////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // Pool de objetos socks5
 //ret --> X 
 //pool --> NULL
@@ -176,32 +179,39 @@ struct fd_handler socks5_handler = {
 /** Intenta aceptar la nueva conexión entrante*/
 void
 socksv5_passive_accept(struct selector_key *key) {
-    struct sockaddr_storage       client_addr;
-    socklen_t                     client_addr_len = sizeof(client_addr);
-    struct client_info                *state           = NULL;
+    struct sockaddr_storage client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
 
-    const int client = accept(key->fd, (struct sockaddr*) &client_addr,
-                                                          &client_addr_len);
+    const int client = accept(key->fd, (struct sockaddr*) &client_addr, &client_addr_len);
     if(client == -1) {
+        log(WARNING, "socksv5_passive_accept (socks5nio.c): accept() retornó -1");
         goto fail;
     }
     if(selector_fd_set_nio(client) == -1) {
+        log(ERROR, "socksv5_passive_accept (socks5nio.c): falló selector_fd_set_nio");
         goto fail;
     }
+
+    struct client_info *state = NULL;
     state = socks5_new(client);
     if(state == NULL) {
         // sin un estado, nos es imposible manejaro.
         // tal vez deberiamos apagar accept() hasta que detectemos
         // que se liberó alguna conexión.
+        log(ERROR, "socksv5_passive_accept (socks5nio.c): falló socks5_new");
         goto fail;
     }
     memcpy(&state->client_addr, &client_addr, client_addr_len);
     state->client_addr_len = client_addr_len;
 
-    if(SELECTOR_SUCCESS != selector_register(key->s, client, &socks5_handler,
-                                              OP_READ, state)) {
+    selector_status ans = selector_register(key->s, client, &socks5_handler, OP_READ, state);
+    if(SELECTOR_SUCCESS != ans) {
+        logf(WARNING, "socksv5_passive_accept (socks5nio.c): selector_register falló (%s)", selector_error(ans));
         goto fail;
     }
+    
+    metrics_login();
+    logf(INFO, "socksv5_passive_accept (socks5nio.c): nuevo cliente (address: %s, socket: %d)", printSocketAddress((struct sockaddr*)&client_addr), client);
     return ;
 fail:
     if(client != -1) {
