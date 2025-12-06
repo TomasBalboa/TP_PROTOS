@@ -29,6 +29,7 @@
 #include "resolver_pool.h"
 #include "./include/logging.h"
 #include "../args.h"
+#include "./include/metrics.h"
 
 static bool done = false;
 
@@ -42,6 +43,8 @@ int
 main(const int argc, char **argv) {
     struct socks5args args;
     parse_args(argc, argv, &args);
+
+    metricsInit(); // Inicializar métricas
 
     // no tenemos nada que leer de stdin
     close(0);
