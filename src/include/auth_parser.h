@@ -16,7 +16,7 @@ enum auth_state {
     AUTH_ERROR
 };
 
-struct auth_parser {
+typedef struct auth_parser {
     enum auth_state state;
 
     uint8_t username_len;
@@ -26,7 +26,7 @@ struct auth_parser {
     uint8_t password_len;
     uint8_t password_read;
     char password[256];
-};
+}auth_parser;
 
 /** Inicializa el parser */
 void auth_parser_init(struct auth_parser *p);
