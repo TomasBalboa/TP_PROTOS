@@ -1,4 +1,4 @@
-#include "managment.h"
+#include "../include/managment/managment.h"
 #include "selector.h"
 #include "stm.h"
 #include <stdio.h>
