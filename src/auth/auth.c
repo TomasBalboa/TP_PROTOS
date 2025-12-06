@@ -6,6 +6,7 @@
 #include "netutils.h"
 #include "auth.h"
 #include "auth_parser.h"
+#include "user_validation.h"  // Módulo compartido de validación
 #include <string.h>
 #include <errno.h>
 // Forward declaration
@@ -94,21 +95,24 @@ unsigned auth_write(struct selector_key *key) {
 
 /**
  * Valida las credenciales y prepara la respuesta.
- * TODO: Integrar con base de datos de usuarios.
+ * Usa el módulo compartido user_validation para validar contra args.users[]
  */
-
 static unsigned auth_process(struct selector_key *key, const struct auth_st *d) {
-
-    
     bool auth_ok = false;
+    bool is_admin = false;
 
-        /* Log username but DO NOT print password in logs */
-        logf(LOG_INFO, "[AUTH] auth_process fd=%d user='%s'", key->fd, d->parser.username);
+    /* Log username but DO NOT print password in logs */
+    logf(LOG_INFO, "[AUTH] auth_process fd=%d user='%s'", key->fd, d->parser.username);
 
-    // EJEMPLO SIMPLE: Permitir cualquier usuario/password
-    // REEMPLAZAR con lógica real
-    if (strlen(d->parser.username) > 0 && strlen(d->parser.password) > 0) {
-        auth_ok = true;  // TODO: Validar credenciales reales
+    // Validar credenciales usando módulo compartido
+    auth_ok = validate_user_credentials(d->parser.username, d->parser.password, &is_admin);
+    
+    if (auth_ok) {
+        logf(LOG_INFO, "[AUTH] fd=%d Usuario '%s' autenticado %s", 
+             key->fd, d->parser.username, is_admin ? "(admin)" : "");
+    } else {
+        logf(LOG_WARNING, "[AUTH] fd=%d Autenticación fallida para '%s'", 
+             key->fd, d->parser.username);
     }
     
     // Escribir respuesta

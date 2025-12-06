@@ -32,13 +32,14 @@ typedef struct mgmt_client{
     struct state_machine stm;
 
     union{
-        auth_parser auth;
+        struct auth_parser auth;  // Parser compartido para auth (RFC 1929)
         //mgmt_command_parser request; //A implementar
     }mgmt_parser;
 
     int client_fd;
     bool closed; 
     bool authenticated;
+    bool is_admin;  // Si el usuario tiene privilegios de admin (NUEVO)
 
     struct buffer client_buffer;
     struct buffer origin_buffer;
