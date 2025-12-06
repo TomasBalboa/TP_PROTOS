@@ -10,17 +10,13 @@ OBJ_DIR = build
 BIN_DIR  = bin
 
 # Archivos fuente
-
-tools: 
-	@chmod +x tools/*.sh || true
-	@chmod +x tools/*.py || true
-
 COMMON_SRC = $(wildcard $(SRC_DIR)/*.c)
 METRICS_SRC = $(wildcard $(SRC_DIR)/logging/*.c) 
 HELLO_SRC = $(wildcard $(SRC_DIR)/handshake/*.c)
 SOCKS5_SRC = $(wildcard $(SRC_DIR)/socks5/*.c)
 REQUEST_SRC = $(wildcard $(SRC_DIR)/request/*.c)
 AUTH_SRC = $(wildcard $(SRC_DIR)/auth/*.c)
+MANAGMENT_SRC = $(wildcard $(SRC_DIR)/managment/*.c)
 ARGS_SRC = args.c
 MANAGEMENT_SRC = $(wildcard $(SRC_DIR)/managment/*.c)
 
@@ -31,11 +27,12 @@ HELLO_OBJ = $(HELLO_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 SOCKS5_OBJ = $(SOCKS5_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 REQUEST_OBJ = $(REQUEST_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 AUTH_OBJ = $(AUTH_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+MANAGMENT_OBJ = $(MANAGMENT_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 ARGS_OBJ = $(OBJ_DIR)/args.o
 MANAGEMENT_OBJ = $(MANAGEMENT_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 # Todos los objetos
-ALL_OBJ = $(COMMON_OBJ) $(METRICS_OBJ) $(HELLO_OBJ) $(SOCKS5_OBJ) $(REQUEST_OBJ) $(AUTH_OBJ) $(ARGS_OBJ) $(MANAGEMENT_OBJ)
+ALL_OBJ = $(COMMON_OBJ) $(METRICS_OBJ) $(HELLO_OBJ) $(SOCKS5_OBJ) $(REQUEST_OBJ) $(AUTH_OBJ) $(MANAGMENT_OBJ) $(ARGS_OBJ)
 
 # Binarios
 SERVER_BIN = $(BIN_DIR)/socks5d
@@ -44,6 +41,10 @@ SERVER_BIN = $(BIN_DIR)/socks5d
 .PHONY: all clean help tools
 
 all: $(SERVER_BIN)
+
+tools:
+	@chmod +x tools/*.sh || true
+	@chmod +x tools/*.py || true
 
 # Limpiar
 clean:
@@ -65,7 +66,7 @@ $(SERVER_BIN): $(ALL_OBJ)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(INC_DIR) -c $< -o $@
+	$(CC) $(CFLAGS) -I$(INC_DIR) -I$(INC_DIR)/managment -c $< -o $@
 
 # Regla especial para args.o (está en la raíz del proyecto)
 $(OBJ_DIR)/args.o: args.c args.h

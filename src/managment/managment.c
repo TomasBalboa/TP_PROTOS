@@ -1,19 +1,12 @@
-#include "../include/managment/managment.h"
+#include "managment/managment.h"
+#include "managment/mgmt_auth.h"  // Módulo de autenticación
+#include "managment/mgmt_command.h"  // Módulo de comandos
 #include "selector.h"
 #include "stm.h"
 #include <stdio.h>
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <unistd.h>
-
-// Prototipos de handlers que vamos a implementar luego (los ponemos aca para que compile)
-void mgmt_auth_init(const unsigned state, struct selector_key *key);
-unsigned mgmt_auth_read(struct selector_key *key);
-unsigned mgmt_auth_write(struct selector_key *key);
-
-void mgmt_command_read_init(const unsigned state, struct selector_key *key);
-unsigned mgmt_command_read(struct selector_key *key);
-unsigned mgmt_command_write(struct selector_key *key);
 
 // Función placeholder para estados sin lógica específica
 static void mgmt_nothing(const unsigned state, struct selector_key *key) {
