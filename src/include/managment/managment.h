@@ -15,6 +15,7 @@
 #include "buffer.h"
 #include "stm.h"
 #include "auth_parser.h"
+#include "managment/mgmt_command_parser.h"
 
 #define MGMT_BUFFER_SIZE 4096
 
@@ -33,7 +34,7 @@ typedef struct mgmt_client{
 
     union{
         struct auth_parser auth;  // Parser compartido para auth (RFC 1929)
-        //mgmt_command_parser request; //A implementar
+        struct mgmt_command_parser request; // parser de comandos de management
     }mgmt_parser;
 
     int client_fd;
@@ -47,7 +48,7 @@ typedef struct mgmt_client{
     uint8_t buff_client[MGMT_BUFFER_SIZE];
     uint8_t buff_origin[MGMT_BUFFER_SIZE];
 
-    //mgmt_command current_command; //El comando que se esta llevando a cabo.
+    mgmt_command current_command; // El comando que se esta llevando a cabo.
 
 } mgmt_client;
 
