@@ -107,8 +107,7 @@ static void mgmt_write(struct selector_key *key) {
     }
 }
 
-// Handler de block (por ahora no usás bloqueantes en management,
-// pero lo dejamos por simetría)
+// Handler de block (dejado por simetría con otros protocolos)
 static void mgmt_block(struct selector_key *key) {
     mgmt_client *client = (mgmt_client *) key->data;
     struct state_machine *stm = &client->stm;
@@ -119,10 +118,9 @@ static void mgmt_block(struct selector_key *key) {
     }
 }
 
-/*
+/**
  * Acepta una nueva conexión de management.
- * Esta función es la que vas a registrar como handle_read en el socket pasivo
- * de management en main.c (similar a socksv5_passive_accept).
+ * Función registrada como handle_read en el socket pasivo de management.
  */
 void managment_passive_accept(struct selector_key *key) {
     struct sockaddr_storage client_addr;

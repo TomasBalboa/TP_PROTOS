@@ -10,7 +10,7 @@
 #define MAX_PASSWORD_LENGTH 64
 #define MAX_USERS          128
 
-/* Admin por defecto opcional (podés usarlo en users_init) */
+/* Credenciales por defecto del administrador */
 #define DEFAULT_ADMIN_USERNAME "admin"
 #define DEFAULT_ADMIN_PASSWORD "1234"
 
