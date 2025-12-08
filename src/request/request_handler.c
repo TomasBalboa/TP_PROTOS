@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
 #include <netdb.h>
 #include <pthread.h>
 #include "logging.h"
@@ -18,6 +19,15 @@
 #include "buffer.h"
 #include "copy.h"
 #include "users.h"
+
+/* Constantes para getnameinfo() si no están definidas por el sistema */
+#ifndef NI_MAXHOST
+#define NI_MAXHOST 1025
+#endif
+
+#ifndef NI_MAXSERV
+#define NI_MAXSERV 32
+#endif
 
 /* inicializa las variables de los estados REQUEST_… */
 void request_init(const unsigned state, struct selector_key *key) {

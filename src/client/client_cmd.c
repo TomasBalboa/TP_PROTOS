@@ -1,4 +1,5 @@
 #include "client_cmd.h"
+#include "client_utils.h"
 
 int cmd_print_help(int socket, int none, char** empty){
     (void) none; (void) empty; (void) socket;
@@ -23,64 +24,74 @@ int cmd_print_help(int socket, int none, char** empty){
 }
 
 int cmd_list_users(int socket, int none, char** empty){
-    (void) none; (void) empty; (void) socket;
-    // placeholder, llama a management
-    printf("+OK: printing users\n\tAndresCamalardo\n");
-    return 1;
+    (void) none; (void) empty;
+    return execute_simple_command(socket, 2, "users");
 }
 
 int cmd_print_metrics(int socket, int none, char** empty){
-    (void) none; (void) empty; (void) socket;
-    // placeholder, llama a management
-    printf("+OK: printing stats\n\tat least 1 (one) user is reading stats\n");
-    return 1;
+    (void) none; (void) empty;
+    return execute_simple_command(socket, 3, "stats");
 }
 
 int cmd_add_user(int socket, int two, char** args){
-    (void) two; (void) socket;
-    // placeholder, llama a management
-    printf("+OK: adding user\n\tadded %s (password: %s)\n", args[0], args[1]);
-    return 1;
+    (void) two;
+    const char* cmd_args[2] = {args[0], args[1]};
+    return execute_command_with_args(socket, 0, cmd_args, 2, "user added");
 }
 
 int cmd_change_pwd(int socket, int two, char** args){
-    (void) two; (void) socket;
-    // placeholder, llama a management
-    printf("+OK: changing password of %s\n\tnew password: %s\n", args[0], args[1]);
-    return 1;
+    (void) two; (void) socket; (void) args;
+    
+    printf("-ERR: command not implemented on server\n");
+    return 0;
 }
 
 int cmd_delete_user(int socket, int one, char** user){
-    (void) one; (void) socket;
-    // placeholder, llama a management
-    printf("+OK: deleting %s\n", user[0]);
-    return 1;
+    (void) one;
+    const char* cmd_args[1] = {user[0]};
+    return execute_command_with_args(socket, 1, cmd_args, 1, "user deleted");
 }
 
 int cmd_change_role(int socket, int two, char** args){
-    (void) two; (void) socket;
-    // placeholder, llama a management
-    printf("+OK: changing role of %s\n\tnew role: %s\n", args[0], args[1]);
-    return 1;
+    (void) two;
+    const char* cmd_args[2] = {args[0], args[1]};
+    return execute_command_with_args(socket, 4, cmd_args, 2, "role changed");
 }
 
 int cmd_audit_user(int socket, int one, char** user){
-    (void) one; (void) socket;
-    // placeholder, llama a management
-    printf("+OK: auditing user\n\t-%s may or may not have done something\n", user[0]);
+    (void) one;
+    const char* cmd_args[1] = {user[0]};
+    
+    /* Construir payload: username */
+    char payload[256];
+    int payload_len = snprintf(payload, sizeof(payload), "%s", user[0]);
+    
+    if(!send_mgmt_command(socket, 7, payload, payload_len)){
+        printf("-ERR: failed to send command\n");
+        return 0;
+    }
+    
+    char response[4096];
+    size_t response_len;
+    uint8_t status = recv_mgmt_response(socket, response, &response_len);
+    
+    if(status != 0){
+        printf("-ERR: %s\n", response_len > 0 ? response : "command failed");
+        return 0;
+    }
+    
+    printf("+OK: activity log for '%s'\n%s", cmd_args[0], response);
     return 1;
 }
 
 int cmd_set_default_auth(int socket, int one, char** method){
-    (void) one; (void) socket;
-    // placeholder, llama a management
-    printf("+OK: setting default method as %s\n", method[0]);
-    return 1;
+    (void) one;
+    const char* cmd_args[1] = {method[0]};
+    return execute_command_with_args(socket, 5, cmd_args, 1, 
+                                     "default auth method set");
 }
 
 int cmd_get_default_auth(int socket, int none, char** empty){    
-    (void) none; (void) socket; (void) empty;
-    // placeholder, llama a management
-    printf("+OK: default method may be u/p or no-auth, idk\n");
-    return 1;
+    (void) none; (void) empty;
+    return execute_simple_command(socket, 6, "default auth method");
 }
