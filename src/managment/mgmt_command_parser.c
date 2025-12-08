@@ -58,9 +58,9 @@ mgmt_parser_state mgmt_command_parser_parse(mgmt_command_parser *p, buffer *buf)
 
         case MGMT_PARSER_LEN:
             // longitud total del payload
-            if (c > MGMT_MAX_STRING_LEN) {
-                set_error(p, MGMT_STATUS_INVALID_LENGTH);
-            } else {
+            //if (c > MGMT_MAX_STRING_LEN) {
+            //    set_error(p, MGMT_STATUS_INVALID_LENGTH);
+            //} else {
                 p->remaining = c;
 
                 // Sin payload y sin args esperados → terminado
@@ -70,7 +70,7 @@ mgmt_parser_state mgmt_command_parser_parse(mgmt_command_parser *p, buffer *buf)
                 } else {
                     p->state = MGMT_PARSER_PAYLOAD;
                 }
-            }
+            //}
             break;
 
         case MGMT_PARSER_PAYLOAD:

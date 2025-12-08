@@ -23,19 +23,19 @@ static unsigned hello_process(struct selector_key *key, const struct hello_st* d
     unsigned ret = HELLO_WRITE;
     uint8_t method = SOCKS5_AUTH_NO_ACCEPTABLE;
 
-    // Preferencia 1: No auth
+    // Preferencia 1: User/Pass (siempre preferir autenticación si está disponible)
     for (uint8_t i = 0; i < d->parser.nmethods; i++) {
-        if (d->parser.methods[i] == SOCKS5_AUTH_NO_AUTH) {
-            method = SOCKS5_AUTH_NO_AUTH;
+        if (d->parser.methods[i] == SOCKS5_AUTH_USER_PASS) {
+            method = SOCKS5_AUTH_USER_PASS;
             break;
         }
     }
 
-    // Preferencia 2: User/Pass si NO_AUTH no está disponible
+    // Preferencia 2: No auth solo si USER_PASS no está disponible
     if (method == SOCKS5_AUTH_NO_ACCEPTABLE) {
         for (uint8_t i = 0; i < d->parser.nmethods; i++) {
-            if (d->parser.methods[i] == SOCKS5_AUTH_USER_PASS) {
-                method = SOCKS5_AUTH_USER_PASS;
+            if (d->parser.methods[i] == SOCKS5_AUTH_NO_AUTH) {
+                method = SOCKS5_AUTH_NO_AUTH;
                 break;
             }
         }

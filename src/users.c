@@ -2,12 +2,12 @@
 
 #include <string.h>
 
-static struct user_t users[MAX_USERS];
+static struct user_t users[MAX_U];
 static size_t user_count = 0;
-static int hash_table[MAX_USERS]; 
+static int hash_table[MAX_U]; 
 
 static void initialize_hash_table(void) {
-    for (int i = 0; i < MAX_USERS; i++) {
+    for (int i = 0; i < MAX_U; i++) {
         hash_table[i] = -1;
     }
 }
@@ -17,7 +17,7 @@ static unsigned int hash_function(const char *str) {
     while (*str) {
         hash = (hash * 31u) + (unsigned char)(*str++);
     }
-    return hash % MAX_USERS;
+    return hash % MAX_U;
 }
 
 // Devuelve índice de usuario o -1 si no existe
@@ -40,7 +40,7 @@ static int find_user(const char *username) {
             return user_idx;
         }
 
-        index = (index + 1) % MAX_USERS;
+        index = (index + 1) % MAX_U;
     } while (index != original);
 
     return -1;
@@ -63,7 +63,7 @@ void users_init(void) {
 }
 
 bool create_user(const char *username, const char *password, bool is_admin) {
-    if (user_count >= MAX_USERS) {
+    if (user_count >= MAX_U) {
         return false;  // sin espacio
     }
     if (!validate_length(username) || !validate_length(password)) {
@@ -88,7 +88,7 @@ bool create_user(const char *username, const char *password, bool is_admin) {
     // insertar en tabla hash
     unsigned int index = hash_function(username);
     while (hash_table[index] != -1) {
-        index = (index + 1) % MAX_USERS;
+        index = (index + 1) % MAX_U;
     }
     hash_table[index] = (int)user_count;
 
@@ -109,7 +109,7 @@ bool delete_user(const char *username) {
             hash_table[index] = -1;
             break;
         }
-        index = (index + 1) % MAX_USERS;
+        index = (index + 1) % MAX_U;
     }
 
     // si no es el último, swappear con el último
@@ -126,7 +126,7 @@ bool delete_user(const char *username) {
         // actualizar tabla hash: encontrar entrada vieja del usuario movido
         unsigned int old_index = hash_function(moved_name);
         while (hash_table[old_index] != (int)user_count - 1) {
-            old_index = (old_index + 1) % MAX_USERS;
+            old_index = (old_index + 1) % MAX_U;
         }
         // reasignar al nuevo índice
         hash_table[old_index] = user_idx;
@@ -146,6 +146,20 @@ bool users_is_admin(const char *username) {
         return false;
     }
     return users[user_idx].is_admin;
+}
+
+bool users_authenticate(const char *username, const char *password, bool *is_admin) {
+    int user_idx = find_user(username);
+    if (user_idx == -1) {
+        return false;
+    }
+    if (strcmp(users[user_idx].pass, password) != 0) {
+        return false;
+    }
+    if (is_admin != NULL) {
+        *is_admin = users[user_idx].is_admin;
+    }
+    return true;
 }
 
 size_t users_get_count(void) {

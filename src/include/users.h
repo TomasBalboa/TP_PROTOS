@@ -8,11 +8,11 @@
 /* Límites de usuario */
 #define MAX_USERNAME_LENGTH 64
 #define MAX_PASSWORD_LENGTH 64
-#define MAX_USERS          128
+#define MAX_U          128
 
 /* Credenciales por defecto del administrador */
 #define DEFAULT_ADMIN_USERNAME "admin"
-#define DEFAULT_ADMIN_PASSWORD "1234"
+#define DEFAULT_ADMIN_PASSWORD "0000"
 
 /* Representación interna de un usuario */
 struct user_t {
@@ -58,6 +58,15 @@ bool exists_user(const char *username);
  * @return true si existe y es admin, false en caso contrario.
  */
 bool users_is_admin(const char *username);
+
+/**
+ * Valida credenciales contra la tabla interna de usuarios.
+ * @param username usuario
+ * @param password contraseña
+ * @param is_admin opcional, setea true si el usuario es admin
+ * @return true si usuario existe y la contraseña coincide
+ */
+bool users_authenticate(const char *username, const char *password, bool *is_admin);
 
 /**
  * @return cantidad de usuarios actualmente registrados.

@@ -32,6 +32,7 @@
 #include "./include/metrics.h"
 #include "./include/user_validation.h"
 #include "./include/managment/managment.h"
+#include "./include/users.h"
 
 static bool done = false;
 
@@ -49,7 +50,7 @@ main(const int argc, char **argv) {
     parse_args(argc, argv, &args);
 
     metricsInit(); // Inicializar métricas
-
+    users_init();   // Inicializar módulo de usuarios
     // no tenemos nada que leer de stdin
     close(0);
 
@@ -80,7 +81,7 @@ main(const int argc, char **argv) {
     }
 
     loggerInit(selector,"",stdout);
-    loggerSetLevel(LOG_OUTPUT);
+    loggerSetLevel(LOG_DEBUG);  // Cambiar a LOG_DEBUG para ver todos los logs
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));

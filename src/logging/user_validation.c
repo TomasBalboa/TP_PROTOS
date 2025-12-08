@@ -3,6 +3,7 @@
 #include "logging.h"
 #include <string.h>
 #include <stdlib.h>
+#include "users.h"
 
 /**
  * user_validation.c - Implementación del módulo de validación de usuarios
@@ -49,34 +50,15 @@ bool validate_user_credentials(const char *username, const char *password, bool 
         return false;
     }
     
-    // Acceder a args global
-    extern struct socks5args args;
-    
-    // Buscar usuario en la lista
-    for (int i = 0; i < MAX_USERS; i++) {
-        // Si llegamos a un slot vacío, terminamos la búsqueda
-        if (args.users[i].name == NULL || args.users[i].name[0] == '\0') {
-            break;
+    bool admin = false;
+    if (users_authenticate(username, password, &admin)) {
+        logf(LOG_INFO, "[USER_VALIDATION] Usuario '%s' autenticado", username);
+        if (is_admin != NULL) {
+            *is_admin = admin;
         }
-        
-        // Comparar username y password
-        if (strcmp(username, args.users[i].name) == 0 &&
-            strcmp(password, args.users[i].pass) == 0) {
-            
-            // Credenciales válidas
-            logf(LOG_INFO, "[USER_VALIDATION] Usuario '%s' autenticado (indice %d)", 
-                 username, i);
-            
-            // El primer usuario (índice 0) es considerado administrador
-            if (is_admin != NULL) {
-                *is_admin = (i == 0);
-            }
-            
-            return true;
-        }
+        return true;
     }
-    
-    // Usuario no encontrado o credenciales incorrectas
+
     logf(LOG_WARNING, "[USER_VALIDATION] Autenticacion fallida para usuario '%s'", username);
     return false;
 }
