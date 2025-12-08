@@ -33,6 +33,8 @@
 #include "./include/user_validation.h"
 #include "./include/managment/managment.h"
 #include "./include/users.h"
+#include "./include/auth_config.h"
+
 
 static bool done = false;
 
@@ -49,8 +51,14 @@ int
 main(const int argc, char **argv) {
     parse_args(argc, argv, &args);
 
-    metricsInit(); // Inicializar métricas
-    users_init();   // Inicializar módulo de usuarios
+    if (!auth_config_init()) {
+        fprintf(stderr, "Error initializing auth_config module. Aborting.\n");
+        exit(1);
+    }
+
+    metricsInit();
+    users_init();  // Inicializar sistema de usuarios
+
     // no tenemos nada que leer de stdin
     close(0);
 
@@ -226,5 +234,6 @@ finally:
     if(server >= 0) {
         close(server);
     }
+    auth_config_cleanup();
     return ret;
 }

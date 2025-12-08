@@ -1,6 +1,7 @@
 #include "managment/managment.h"
 #include "managment/mgmt_command.h"
 #include "managment/mgmt_command_parser.h"
+#include "auth_config.h"
 #include "users.h"
 #include "metrics.h"
 #include "selector.h"
@@ -25,12 +26,25 @@ static bool mgmt_list_users_handler(mgmt_command_parser *parser,
 static bool mgmt_stats_handler(mgmt_command_parser *parser,
                                struct buffer *response_buffer);
 
+static bool mgmt_change_role_handler(mgmt_command_parser *parser,
+                                     struct buffer *response_buffer);
+static bool mgmt_set_default_auth_handler(mgmt_command_parser *parser,
+                                          struct buffer *response_buffer);
+static bool mgmt_get_default_auth_handler(mgmt_command_parser *parser,
+                                          struct buffer *response_buffer);
+static bool mgmt_user_activity_handler(mgmt_command_parser *parser,
+                                       struct buffer *response_buffer);
+
 // Tabla de handlers indexada por enum mgmt_command
 static mgmt_command_handler command_handlers[] = {
     mgmt_add_user_handler,    // MGMT_ADD_USER
     mgmt_delete_user_handler, // MGMT_DELETE_USER
     mgmt_list_users_handler,  // MGMT_LIST_USERS
     mgmt_stats_handler,       // MGMT_STATS
+    mgmt_change_role_handler,       // MGMT_CHANGE_ROLE
+    mgmt_set_default_auth_handler,  // MGMT_SET_DEFAULT_AUTH_METHOD
+    mgmt_get_default_auth_handler,  // MGMT_GET_DEFAULT_AUTH_METHOD
+    mgmt_user_activity_handler,     // MGMT_USER_ACTIVITY
 };
 
 // Qué comandos requieren privilegios de admin
@@ -39,6 +53,10 @@ static bool needs_admin_privileges[] = {
     true,  // MGMT_DELETE_USER
     false, // MGMT_LIST_USERS
     false, // MGMT_STATS
+    true,  // MGMT_CHANGE_ROLE
+    true,  // MGMT_SET_DEFAULT_AUTH_METHOD
+    true,  // MGMT_GET_DEFAULT_AUTH_METHOD
+    true,  // MGMT_USER_ACTIVITY
 };
 
 void mgmt_command_read_init(const unsigned state, struct selector_key *key) {
@@ -270,3 +288,153 @@ static bool mgmt_process_command(mgmt_command_parser *parser,
 
     return command_handlers[parser->command](parser, resp);
 }
+
+static bool mgmt_set_default_auth_handler(mgmt_command_parser *parser,
+                                          struct buffer *response_buffer) {
+    if (parser->args_count != 1) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_INVALID_ARGS,
+                                                  "set_default_auth: expected 1 arg");
+    }
+
+    const char *method_str = (const char *)parser->args[0];
+    enum socks5_auth_method method;
+
+    if (strcmp(method_str, "no_auth") == 0) {
+        method = SOCKS5_AUTH_NO_AUTH;
+    } else if (strcmp(method_str, "username_password") == 0) {
+        method = SOCKS5_AUTH_USER_PASS;
+    } else {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_INVALID_ARGS,
+                                                  "set_default_auth: method must be 'no_auth' or 'username_password'");
+    }
+
+    if (!auth_config_set_default(method)) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_SERVER_ERROR,
+                                                  "set_default_auth: failed");
+    }
+
+    return mgmt_command_parser_build_response(parser, response_buffer,
+                                              MGMT_STATUS_OK,
+                                              "set_default_auth: ok");
+}
+
+static bool mgmt_get_default_auth_handler(mgmt_command_parser *parser,
+                                          struct buffer *response_buffer) {
+    if (parser->args_count != 0) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_INVALID_ARGS,
+                                                  "get_default_auth: expected 0 args");
+    }
+
+    enum socks5_auth_method method = auth_config_get_default();
+    const char *method_str = (method == SOCKS5_AUTH_NO_AUTH)
+                             ? "no_auth"
+                             : "username_password";
+
+    char body[64];
+    int len = snprintf(body, sizeof(body),
+                       "Default auth method: %s\n", method_str);
+    if (len < 0) return false;
+
+    if (!mgmt_command_parser_build_response(parser, response_buffer,
+                                            MGMT_STATUS_OK, NULL)) {
+        return false;
+    }
+
+    size_t available;
+    uint8_t *ptr = buffer_write_ptr(response_buffer, &available);
+    if ((size_t)len > available) return false;
+
+    memcpy(ptr, body, len);
+    buffer_write_adv(response_buffer, len);
+
+    return true;
+}
+
+static bool mgmt_change_role_handler(mgmt_command_parser *parser,
+                                     struct buffer *response_buffer) {
+    if (parser->args_count != 2) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_INVALID_ARGS,
+                                                  "change_role: expected 2 args");
+    }
+
+    const char *username = (const char *)parser->args[0];
+    const char *role_str = (const char *)parser->args[1];
+
+    if (!exists_user(username)) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_INVALID_ARGS,
+                                                  "change_role: user not found");
+    }
+
+    bool make_admin;
+    if (strcmp(role_str, "admin") == 0) {
+        make_admin = true;
+    } else if (strcmp(role_str, "user") == 0) {
+        make_admin = false;
+    } else {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_INVALID_ARGS,
+                                                  "change_role: role must be 'admin' or 'user'");
+    }
+
+    if (!users_change_role(username, make_admin)) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_SERVER_ERROR,
+                                                  "change_role: failed");
+    }
+
+    return mgmt_command_parser_build_response(parser, response_buffer,
+                                              MGMT_STATUS_OK,
+                                              "change_role: role changed");
+}
+
+
+static bool mgmt_user_activity_handler(mgmt_command_parser *parser,
+                                       struct buffer *response_buffer) {
+    if (parser->args_count != 1) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_INVALID_ARGS,
+                                                  "user_activity: expected 1 argument");
+    }
+
+    const char *username = (const char *)parser->args[0];
+
+    if (!exists_user(username)) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_SERVER_ERROR,
+                                                  "user_activity: user not found");
+    }
+
+    if (!mgmt_command_parser_build_response(parser, response_buffer,
+                                            MGMT_STATUS_OK, NULL)) {
+        return false;
+    }
+
+    char response[512];
+    int response_len = snprintf(response, sizeof(response),
+                               "Activity log for user: %s\n"
+                               "No activity records available\n",
+                               username);
+
+    size_t available;
+    uint8_t *ptr = buffer_write_ptr(response_buffer, &available);
+    if ((size_t)response_len > available) {
+        return false;
+    }
+
+    memcpy(ptr, response, response_len);
+    buffer_write_adv(response_buffer, response_len);
+
+    return true;
+}
+
+
+
+
+
+
