@@ -1,6 +1,7 @@
 #include "users.h"
 
 #include <string.h>
+#include <time.h>
 
 static struct user_t users[MAX_U];
 static size_t user_count = 0;
@@ -81,6 +82,10 @@ bool create_user(const char *username, const char *password, bool is_admin) {
     strncpy(u.pass, password, MAX_PASSWORD_LENGTH);
     u.pass[MAX_PASSWORD_LENGTH] = '\0';
     u.is_admin = is_admin;
+
+    // inicializar campos de logs de acceso
+    u.access_log_count = 0;
+    u.current_access_log_index = 0;
 
     // insertar en array
     users[user_count] = u;
@@ -199,6 +204,58 @@ bool users_change_role(const char *username, bool is_admin) {
 
     users[user_idx].is_admin = is_admin;
     return true;
+}
+
+void users_add_access_log(const char *username, const char *ip_or_site) {
+    int user_idx = find_user(username);
+    if (user_idx == -1 || ip_or_site == NULL) {
+        return;
+    }
+
+    struct user_t *user = &users[user_idx];
+
+    size_t idx = user->current_access_log_index;
+
+    user->access_logs[idx].timestamp = (uint64_t)time(NULL);
+    strncpy(user->access_logs[idx].ip_or_site, ip_or_site,
+            sizeof(user->access_logs[idx].ip_or_site) - 1);
+    user->access_logs[idx].ip_or_site[sizeof(user->access_logs[idx].ip_or_site) - 1] = '\0';
+
+    user->current_access_log_index = (idx + 1) % MAX_ACCESS_LOGS;
+    if (user->access_log_count < MAX_ACCESS_LOGS) {
+        user->access_log_count++;
+    }
+}
+
+size_t get_user_access_history(const char *username,
+                               struct access_log_t *logs,
+                               size_t max_logs) {
+    if (logs == NULL || max_logs == 0) {
+        return 0;
+    }
+
+    int user_idx = find_user(username);
+    if (user_idx == -1) {
+        return 0;
+    }
+
+    struct user_t *user = &users[user_idx];
+    size_t count = user->access_log_count < max_logs
+                     ? user->access_log_count
+                     : max_logs;
+
+    if (count == 0) {
+        return 0;
+    }
+
+    size_t start_idx = (user->current_access_log_index + MAX_ACCESS_LOGS - user->access_log_count) % MAX_ACCESS_LOGS;
+
+    for (size_t i = 0; i < count; i++) {
+        size_t idx = (start_idx + i) % MAX_ACCESS_LOGS;
+        logs[i] = user->access_logs[idx];
+    }
+
+    return count;
 }
 
 
