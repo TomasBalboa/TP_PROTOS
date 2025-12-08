@@ -3,6 +3,7 @@
 #include "logging.h"
 #include "user_validation.h"
 #include "auth.h"
+#include "users.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -85,19 +86,23 @@ unsigned mgmt_auth_read(struct selector_key *key) {
         // Validar credenciales usando módulo compartido
         bool is_admin = false;
         bool authenticated = try_to_authenticate(p->username, p->password, &is_admin);
-        
+
         // Actualizar estado del cliente
         data->authenticated = authenticated;
         data->is_admin = is_admin;
-        
+
         if (authenticated) {
-            logf(LOG_INFO, "[MGMT_AUTH] fd=%d: Usuario '%s' autenticado %s", 
+            logf(LOG_INFO, "[MGMT_AUTH] fd=%d: Usuario '%s' autenticado %s",
                  data->client_fd, p->username, is_admin ? "(admin)" : "");
+            // Registrar autenticación exitosa de management
+            users_add_access_log(p->username, "management auth success");
         } else {
-            logf(LOG_WARNING, "[MGMT_AUTH] fd=%d: Autenticación fallida para '%s'", 
+            logf(LOG_WARNING, "[MGMT_AUTH] fd=%d: Autenticación fallida para '%s'",
                  data->client_fd, p->username);
+            // Registrar intento fallido de management (opcional)
+            users_add_access_log(p->username, "management auth failed");
         }
-        
+
         // Construir respuesta usando la función original auth_marshall_response()
         if (auth_marshall_response(&data->origin_buffer, authenticated) == -1) {
             logf(LOG_ERROR, "[MGMT_AUTH] fd=%d: Error construyendo respuesta", data->client_fd);

@@ -9,6 +9,7 @@
 #include "user_validation.h"  // Módulo compartido de validación
 #include <string.h>
 #include <errno.h>
+#include "users.h"
 // Forward declaration
 static unsigned auth_process(struct selector_key *key, const struct auth_st *d);
 
@@ -106,23 +107,27 @@ static unsigned auth_process(struct selector_key *key, const struct auth_st *d) 
 
     // Validar credenciales usando módulo compartido
     auth_ok = validate_user_credentials(d->parser.username, d->parser.password, &is_admin);
-    
+
     if (auth_ok) {
-        logf(LOG_INFO, "[AUTH] fd=%d Usuario '%s' autenticado %s", 
+        logf(LOG_INFO, "[AUTH] fd=%d User '%s' Authenticated %s",
              key->fd, d->parser.username, is_admin ? "(admin)" : "");
+        // Registrar en historial de accesos del usuario
+        users_add_access_log(d->parser.username, "socks5 auth success");
     } else {
-        logf(LOG_WARNING, "[AUTH] fd=%d Autenticación fallida para '%s'", 
+        logf(LOG_WARNING, "[AUTH] fd=%d User '%s' Authentication failed",
              key->fd, d->parser.username);
+        // Registrar intento fallido (opcional pero útil para auditoría)
+        users_add_access_log(d->parser.username, "socks5 auth failed");
     }
-    
+
     // Escribir respuesta
     if (auth_marshall_response((buffer *)d->wb, auth_ok) == -1) {
         return ERROR;
     }
-    
+
     if (auth_ok) {
         // Guardar username en client_info para logging/estadísticas
-        strncpy(ATTACHMENT(key)->username, d->parser.username, 
+        strncpy(ATTACHMENT(key)->username, d->parser.username,
                 sizeof(ATTACHMENT(key)->username) - 1);
         ATTACHMENT(key)->username[sizeof(ATTACHMENT(key)->username) - 1] = '\0';
         return AUTH_WRITE;

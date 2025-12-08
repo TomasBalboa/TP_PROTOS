@@ -17,6 +17,7 @@
 #include "request_handler.h"
 #include "buffer.h"
 #include "copy.h"
+#include "users.h"
 
 /* inicializa las variables de los estados REQUEST_… */
 void request_init(const unsigned state, struct selector_key *key) {
@@ -72,25 +73,25 @@ unsigned request_write_error_response(struct selector_key *key) {
 unsigned request_try_connect(struct selector_key *key) {
     struct client_info *s = ATTACHMENT(key);
     struct request_st *d = &s->client.request;
-    
+
     logf(LOG_INFO, "[REQUEST] request_try_connect fd=%d", key->fd);
-    
+
     /* Intentar cada dirección resuelta */
     while (s->current_resolution != NULL) {
         logf(LOG_DEBUG, "[REQUEST] Trying connection attempt fd=%d", key->fd);
-        
+
         int origin_fd = socket(s->current_resolution->ai_family,
                                s->current_resolution->ai_socktype,
                                s->current_resolution->ai_protocol);
-        
+
         if (origin_fd < 0) {
             logf(LOG_WARNING, "[REQUEST] socket() failed: %s fd=%d", strerror(errno), key->fd);
             s->current_resolution = s->current_resolution->ai_next;
             continue;
         }
-        
+
         logf(LOG_DEBUG, "[REQUEST] Created origin_fd=%d for client_fd=%d", origin_fd, key->fd);
-        
+
         /* Modo no bloqueante */
         if (selector_fd_set_nio(origin_fd) == -1) {
             logf(LOG_WARNING, "[REQUEST] selector_fd_set_nio failed fd=%d origin_fd=%d", key->fd, origin_fd);
@@ -98,16 +99,32 @@ unsigned request_try_connect(struct selector_key *key) {
             s->current_resolution = s->current_resolution->ai_next;
             continue;
         }
-        
+
         /* Conectar (no bloqueante) */
-        int conn_ret = connect(origin_fd, 
-                              s->current_resolution->ai_addr,
-                              s->current_resolution->ai_addrlen);
-        
-        logf(LOG_DEBUG, "[REQUEST] connect() returned %d errno=%d (%s) fd=%d origin_fd=%d", 
+        int conn_ret = connect(origin_fd,
+                               s->current_resolution->ai_addr,
+                               s->current_resolution->ai_addrlen);
+
+        logf(LOG_DEBUG, "[REQUEST] connect() returned %d errno=%d (%s) fd=%d origin_fd=%d",
              conn_ret, errno, strerror(errno), key->fd, origin_fd);
-        
+
         if (conn_ret == 0 || (conn_ret == -1 && errno == EINPROGRESS)) {
+            /* Registro de conexión en historial de usuario (si tenemos username) */
+            if (s->username[0] != '\0') {
+                char hostbuf[NI_MAXHOST];
+                char portbuf[NI_MAXSERV];
+
+                if (getnameinfo(s->current_resolution->ai_addr,
+                                s->current_resolution->ai_addrlen,
+                                hostbuf, sizeof(hostbuf),
+                                portbuf, sizeof(portbuf),
+                                NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+                    char dest[128];
+                    snprintf(dest, sizeof(dest), "%s:%s", hostbuf, portbuf);
+                    users_add_access_log(s->username, dest);
+                }
+            }
+
             /* Conexión en progreso */
             s->origin_fd = origin_fd;
             d->reply = SOCKS5_REPLY_SUCCESS;
@@ -144,12 +161,12 @@ unsigned request_try_connect(struct selector_key *key) {
             logf(LOG_ERROR, "[REQUEST] selector_set_interest_key failed fd=%d", key->fd);
             return ERROR;
         }
-        
+
         logf(LOG_WARNING, "[REQUEST] connect failed, trying next address fd=%d", key->fd);
         close(origin_fd);
         s->current_resolution = s->current_resolution->ai_next;
     }
-    
+
     /* Todas las conexiones fallaron */
     logf(LOG_ERROR, "[REQUEST] All connection attempts failed fd=%d", key->fd);
     d->reply = SOCKS5_REPLY_HOST_UNREACHABLE;
