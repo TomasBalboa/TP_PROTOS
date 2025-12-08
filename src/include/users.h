@@ -4,11 +4,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "args.h"
 
 /* Límites de usuario */
 #define MAX_USERNAME_LENGTH 64
 #define MAX_PASSWORD_LENGTH 64
-#define MAX_USERS          128
 
 /* Credenciales por defecto del administrador */
 #define DEFAULT_ADMIN_USERNAME "admin"
@@ -73,5 +73,13 @@ size_t users_get_count(void);
  * @return cantidad de bytes escritos en dst.
  */
 size_t users_dump_usernames(uint8_t *dst, size_t dst_len);
+
+/**
+ * Cambia el rol (admin / no admin) de un usuario existente.
+ * @param username nombre de usuario
+ * @param is_admin nuevo valor de admin
+ * @return true si se cambió, false si el usuario no existe.
+ */
+bool users_change_role(const char *username, bool is_admin);
 
 #endif /* USERS_H */

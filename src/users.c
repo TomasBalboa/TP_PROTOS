@@ -176,3 +176,15 @@ size_t users_dump_usernames(uint8_t *dst, size_t dst_len) {
 
     return written;
 }
+
+bool users_change_role(const char *username, bool is_admin) {
+    int user_idx = find_user(username);
+    if (user_idx == -1) {
+        return false;  // no existe
+    }
+
+    users[user_idx].is_admin = is_admin;
+    return true;
+}
+
+
