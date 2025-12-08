@@ -2,6 +2,7 @@
 
 int cmd_print_help(int socket, int none, char** empty){
     (void) none; (void) empty; (void) socket;
+    printf("Usage: <exe> <host> <port> <command> (args)\nUse '$' as host or port if you wish to use the default values (localhost and 8080)\n\n");
     for(int i = 0; i < CLIENT_CMD_SIZE; i++){
         if(commands[i].args){
             printf("%s %s %s\n\t%s\n",
