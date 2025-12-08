@@ -1,4 +1,4 @@
-#include "client_utils.h"
+#include "client_cmd.h"
 
 int cmd_print_help(int socket, int none, char** empty){
     (void) none; (void) empty; (void) socket;

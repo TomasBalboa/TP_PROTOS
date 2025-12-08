@@ -1,5 +1,5 @@
-#ifndef __CLIENT_UTILS_H__
-#define __CLIENT_UTILS_H__
+#ifndef __CLIENT_CMD_H__
+#define __CLIENT_CMD_H__
 
 #include <stdbool.h>
 #include <stddef.h>
