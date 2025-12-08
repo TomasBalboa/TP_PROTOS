@@ -13,7 +13,7 @@ static uint8_t expected_args_for(mgmt_command cmd) {
         case MGMT_CHANGE_ROLE:             return 2; 
         case MGMT_SET_DEFAULT_AUTH_METHOD: return 1; 
         case MGMT_GET_DEFAULT_AUTH_METHOD: return 0;
-        case MGMT_INFO_USER:   return 1;
+        case MGMT_USER_ACTIVITY:   return 1;
         default:               return 0;
     }
 }
@@ -52,7 +52,7 @@ mgmt_parser_state mgmt_command_parser_parse(mgmt_command_parser *p, buffer *buf)
 
         case MGMT_PARSER_COMMAND:
             p->command = (mgmt_command)c;
-            if (p->command < MGMT_ADD_USER ||p->command > MGMT_INFO_USER) {
+            if (p->command < MGMT_ADD_USER ||p->command > MGMT_USER_ACTIVITY) {
                 set_error(p, MGMT_STATUS_INVALID_COMMAND);
             } else {
                 p->expected_args = expected_args_for(p->command);

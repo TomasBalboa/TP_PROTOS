@@ -20,7 +20,7 @@ typedef enum {
     MGMT_CHANGE_ROLE,
     MGMT_SET_DEFAULT_AUTH_METHOD,
     MGMT_GET_DEFAULT_AUTH_METHOD,
-    MGMT_INFO_USER,
+    MGMT_USER_ACTIVITY,
 } mgmt_command;
 
 typedef enum {

@@ -32,8 +32,8 @@ static bool mgmt_set_default_auth_handler(mgmt_command_parser *parser,
                                           struct buffer *response_buffer);
 static bool mgmt_get_default_auth_handler(mgmt_command_parser *parser,
                                           struct buffer *response_buffer);
-static bool mgmt_info_user_handler(mgmt_command_parser *parser,
-                                   struct buffer *response_buffer);
+static bool mgmt_user_activity_handler(mgmt_command_parser *parser,
+                                       struct buffer *response_buffer);
 
 // Tabla de handlers indexada por enum mgmt_command
 static mgmt_command_handler command_handlers[] = {
@@ -44,7 +44,7 @@ static mgmt_command_handler command_handlers[] = {
     mgmt_change_role_handler,       // MGMT_CHANGE_ROLE
     mgmt_set_default_auth_handler,  // MGMT_SET_DEFAULT_AUTH_METHOD
     mgmt_get_default_auth_handler,  // MGMT_GET_DEFAULT_AUTH_METHOD
-    mgmt_info_user_handler,         // MGMT_INFO_USER
+    mgmt_user_activity_handler,     // MGMT_USER_ACTIVITY
 };
 
 // Qué comandos requieren privilegios de admin
@@ -56,7 +56,7 @@ static bool needs_admin_privileges[] = {
     true,  // MGMT_CHANGE_ROLE
     true,  // MGMT_SET_DEFAULT_AUTH_METHOD
     true,  // MGMT_GET_DEFAULT_AUTH_METHOD
-    true,  // MGMT_INFO_USER (auditar usuario suele ser admin-only)
+    true,  // MGMT_USER_ACTIVITY
 };
 
 void mgmt_command_read_init(const unsigned state, struct selector_key *key) {
@@ -393,16 +393,48 @@ static bool mgmt_change_role_handler(mgmt_command_parser *parser,
                                               "change_role: role changed");
 }
 
-// HACER !!!
 
-static bool mgmt_info_user_handler(mgmt_command_parser *parser,
-                                   struct buffer *response_buffer) {
-    (void)parser;
+static bool mgmt_user_activity_handler(mgmt_command_parser *parser,
+                                       struct buffer *response_buffer) {
+    if (parser->args_count != 1) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_INVALID_ARGS,
+                                                  "user_activity: expected 1 argument");
+    }
 
-    return mgmt_command_parser_build_response(parser, response_buffer,
-                                              MGMT_STATUS_SERVER_ERROR,
-                                              "info_user: not implemented");
+    const char *username = (const char *)parser->args[0];
+
+    if (!exists_user(username)) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_SERVER_ERROR,
+                                                  "user_activity: user not found");
+    }
+
+    if (!mgmt_command_parser_build_response(parser, response_buffer,
+                                            MGMT_STATUS_OK, NULL)) {
+        return false;
+    }
+
+    char response[512];
+    int response_len = snprintf(response, sizeof(response),
+                               "Activity log for user: %s\n"
+                               "No activity records available\n",
+                               username);
+
+    size_t available;
+    uint8_t *ptr = buffer_write_ptr(response_buffer, &available);
+    if ((size_t)response_len > available) {
+        return false;
+    }
+
+    memcpy(ptr, response, response_len);
+    buffer_write_adv(response_buffer, response_len);
+
+    return true;
 }
+
+
+
 
 
 
