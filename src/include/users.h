@@ -15,12 +15,27 @@
 #define DEFAULT_ADMIN_USERNAME "admin"
 #define DEFAULT_ADMIN_PASSWORD "0000"
 
+/* Máximo de logs de acceso */
+#define MAX_ACCESS_LOGS 16
+
+/* Registro de acceso */
+struct access_log_t {
+    uint64_t timestamp;
+    char ip_or_site[64]; // tamaño razonable para host/ip
+};
+
 /* Representación interna de un usuario */
 struct user_t {
     char name[MAX_USERNAME_LENGTH + 1];   /* null-terminated */
     char pass[MAX_PASSWORD_LENGTH + 1];   /* null-terminated */
     bool is_admin;
+
+    struct access_log_t access_logs[MAX_ACCESS_LOGS];
+    size_t access_log_count;
+    size_t current_access_log_index;
 };
+
+
 
 /**
  * Inicializa el sistema de usuarios.
@@ -91,5 +106,11 @@ size_t users_dump_usernames(uint8_t *dst, size_t dst_len);
  * @return true si se cambió, false si el usuario no existe.
  */
 bool users_change_role(const char *username, bool is_admin);
+
+void users_add_access_log(const char *username, const char *ip_or_site);
+
+size_t get_user_access_history(const char *username,
+                               struct access_log_t *logs,
+                               size_t max_logs);
 
 #endif /* USERS_H */

@@ -410,16 +410,46 @@ static bool mgmt_user_activity_handler(mgmt_command_parser *parser,
                                                   "user_activity: user not found");
     }
 
+    struct access_log_t logs[MAX_ACCESS_LOGS];
+    size_t total_logs = get_user_access_history(username, logs, MAX_ACCESS_LOGS);
+
+    if (total_logs == 0) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_SERVER_ERROR,
+                                                  "user_activity: no activity logs found for user");
+    }
+
     if (!mgmt_command_parser_build_response(parser, response_buffer,
                                             MGMT_STATUS_OK, NULL)) {
         return false;
     }
 
-    char response[512];
-    int response_len = snprintf(response, sizeof(response),
-                               "Activity log for user: %s\n"
-                               "No activity records available\n",
-                               username);
+    char response[1024];
+    int response_len = 0;
+
+    response_len += snprintf(response + response_len,
+                             sizeof(response) - response_len,
+                             "Access history for %s (%zu records):\n",
+                             username, total_logs);
+
+    for (size_t i = 0; i < total_logs && response_len < (int)sizeof(response) - 1; i++) {
+        char time_str[64];
+        time_t timestamp = (time_t)logs[i].timestamp;
+        struct tm *tm_info = localtime(&timestamp);
+
+        if (tm_info != NULL) {
+            strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
+            response_len += snprintf(response + response_len,
+                                     sizeof(response) - response_len,
+                                     "%s - %s\n",
+                                     time_str, logs[i].ip_or_site);
+        } else {
+            response_len += snprintf(response + response_len,
+                                     sizeof(response) - response_len,
+                                     "[Invalid date] - %s\n",
+                                     logs[i].ip_or_site);
+        }
+    }
 
     size_t available;
     uint8_t *ptr = buffer_write_ptr(response_buffer, &available);
