@@ -1,8 +1,8 @@
 #include "../include/logging.h"
 
 #define DEFAULT_LOG_DIR "./log"
-#define DEFAULT_LOG_FILE (DEFAULT_LOG_DIR "/%02d-%02d-%04d.log")
-#define DEFAULT_LOG_FILE_MAXSTRLEN 48
+#define DEFAULT_LOG_FILE (DEFAULT_LOG_DIR "/%02d-%02d-%04d_%02d-%02d.log")
+#define DEFAULT_LOG_FILE_MAXSTRLEN 64
 
 /** The minimum allowed length for the log writing buffer. */
 #define LOG_MIN_BUFFER_SIZE 0x1000 // 4 KBs
@@ -132,7 +132,9 @@ static int tryOpenLogfile(const char* logFile, struct tm tm) {
 
     // If logFile is "", then we use the default log file name instead.
     if (logFile[0] == '\0') {
-        snprintf(logfilebuf, DEFAULT_LOG_FILE_MAXSTRLEN, DEFAULT_LOG_FILE, tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900);
+        snprintf(logfilebuf, DEFAULT_LOG_FILE_MAXSTRLEN, DEFAULT_LOG_FILE, 
+                 tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900,
+                 tm.tm_hour, tm.tm_min);
         logFile = logfilebuf;
 
         // If the default log folder isn't created, create it.
