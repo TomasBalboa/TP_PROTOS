@@ -2,26 +2,23 @@
 
 # ================= CONFIG =================
 
-CONNECTIONS=5000          # Total de conexiones a lanzar
-CONCURRENCY=800           # Número de conexiones concurrentes máximas
+CONNECTIONS=3000          # Total de conexiones a lanzar
+CONCURRENCY=500           # Número de conexiones concurrentes máximas
 SERVER="127.0.0.1"        # Dirección del proxy
 PORT="1080"               # Puerto del proxy SOCKS5 (sin auth)
 
-# Endpoints a probar (mezcla de páginas y archivos de distinto tamaño)
 URLS=(
   "https://speed.hetzner.de/1MB.bin"
   "https://speed.hetzner.de/10MB.bin"
-  # "https://speed.hetzner.de/100MB.bin"   
+  "https://speed.hetzner.de/100MB.bin"   
   "https://example.com"
   "https://www.google.com"
   "https://www.cloudflare.com"
-  "https://www.wikipedia.org"
   "https://www.gnu.org"
+  "https://www.wikipedia.org"
   "https://www.kernel.org"
   "https://www.mozilla.org"
 )
-
-# ==========================================
 
 URLS_JOINED=$(IFS='|'; echo "${URLS[*]}")
 
@@ -52,7 +49,6 @@ echo "[run] Lanzando conexiones..."
 seq 1 "$CONNECTIONS" | xargs -n1 -P"$CONCURRENCY" -I{} bash -c '
   ID="$1"
 
-  # reconstruir array de URLs
   IFS="|" read -r -a URL_ARRAY <<< "'"$URLS_JOINED"'"
   IDX=$(( (ID - 1) % ${#URL_ARRAY[@]} ))
   URL="${URL_ARRAY[$IDX]}"
@@ -70,7 +66,7 @@ seq 1 "$CONNECTIONS" | xargs -n1 -P"$CONCURRENCY" -I{} bash -c '
 ' _ {}
 
 echo ""
-echo "Stress test completado. Resultados detallados en $LOGFILE"
+echo "Stress test completado. Los resultados detallados se encuentran en $LOGFILE"
 echo ""
 
 echo "== HTTP code summary =="
