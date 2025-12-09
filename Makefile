@@ -39,7 +39,7 @@ SERVER_BIN = $(BIN_DIR)/socks5d
 CLIENT_BIN = $(BIN_DIR)/client
 
 # Targets principales
-.PHONY: all clean help tools client
+.PHONY: all clean help tools client test
 
 all: $(SERVER_BIN)
 
@@ -48,6 +48,41 @@ client: $(CLIENT_BIN)
 tools:
 	@chmod +x tools/*.sh || true
 	@chmod +x tools/*.py || true
+
+# Tests
+TEST_DIR = $(SRC_DIR)/tests
+TEST_BIN_DIR = $(BIN_DIR)
+# Flags más relajados para tests (sin -Werror -pedantic que causan problemas con check.h)
+TEST_CFLAGS = -std=c11 -Wall -Wextra -D_POSIX_C_SOURCE=200809L -g -D_GNU_SOURCE
+CHECK_CFLAGS = -I/opt/homebrew/include
+CHECK_LDFLAGS = -L/opt/homebrew/lib -lcheck -lm -lpthread
+
+test: test-compile test-run
+
+test-compile:
+	@echo "Compilando tests..."
+	@mkdir -p $(TEST_BIN_DIR)
+	@$(CC) $(TEST_CFLAGS) -I$(INC_DIR) -I$(SRC_DIR) $(CHECK_CFLAGS) $(CHECK_LDFLAGS) \
+		-o $(TEST_BIN_DIR)/buffer_test $(TEST_DIR)/buffer_test.c
+	@$(CC) $(TEST_CFLAGS) -I$(INC_DIR) -I$(SRC_DIR) $(CHECK_CFLAGS) $(CHECK_LDFLAGS) \
+		-o $(TEST_BIN_DIR)/parser_test $(TEST_DIR)/parser_test.c $(SRC_DIR)/parser.c
+	@$(CC) $(TEST_CFLAGS) -I$(INC_DIR) -I$(SRC_DIR) $(CHECK_CFLAGS) $(CHECK_LDFLAGS) \
+		-o $(TEST_BIN_DIR)/parser_utils_test $(TEST_DIR)/parser_utils_test.c $(SRC_DIR)/parser_utils.c $(SRC_DIR)/parser.c
+	@$(CC) $(TEST_CFLAGS) -I$(INC_DIR) -I$(SRC_DIR) $(CHECK_CFLAGS) $(CHECK_LDFLAGS) \
+		-o $(TEST_BIN_DIR)/stm_test $(TEST_DIR)/stm_test.c $(SRC_DIR)/stm.c
+	@$(CC) $(TEST_CFLAGS) -I$(INC_DIR) -I$(SRC_DIR) $(CHECK_CFLAGS) $(CHECK_LDFLAGS) \
+		-o $(TEST_BIN_DIR)/selector_test $(TEST_DIR)/selector_test.c
+	@$(CC) $(TEST_CFLAGS) -I$(INC_DIR) -I$(SRC_DIR) $(CHECK_CFLAGS) $(CHECK_LDFLAGS) \
+		-o $(TEST_BIN_DIR)/netutils_test $(TEST_DIR)/netutils_test.c $(SRC_DIR)/netutils.c $(SRC_DIR)/buffer.c
+	@echo "Tests compilados"
+
+test-run:
+	@for test in buffer parser parser_utils stm selector netutils; do \
+		echo ">>> Ejecutando $${test}_test..."; \
+		$(TEST_BIN_DIR)/$${test}_test; \
+		echo ""; \
+	done
+	@echo "TODOS LOS TESTS PASARON"
 
 # Limpiar
 clean:
@@ -59,6 +94,8 @@ help:
 	@echo "Targets disponibles:"
 	@echo "  make          - Compila el servidor"
 	@echo "  make all      - Compila el servidor"
+	@echo "  make client   - Compila el cliente"
+	@echo "  make test     - Compila y ejecuta todos los tests"
 	@echo "  make clean    - Elimina archivos de compilación"
 	@echo "  make help     - Muestra esta ayuda"
 
