@@ -39,7 +39,7 @@ SERVER_BIN = $(BIN_DIR)/socks5d
 CLIENT_BIN = $(BIN_DIR)/client
 
 # Targets principales
-.PHONY: all clean help tools client test
+.PHONY: all clean help tools client test stress-test
 
 all: $(SERVER_BIN)
 
@@ -48,6 +48,9 @@ client: $(CLIENT_BIN)
 tools:
 	@chmod +x tools/*.sh || true
 	@chmod +x tools/*.py || true
+
+stress-test: $(SERVER_BIN)
+	@./tools/stress_test.sh
 
 # Tests
 TEST_DIR = $(SRC_DIR)/tests
@@ -98,6 +101,7 @@ help:
 	@echo "  make test     - Compila y ejecuta todos los tests"
 	@echo "  make clean    - Elimina archivos de compilación"
 	@echo "  make help     - Muestra esta ayuda"
+	@echo "  make stress-test  - Ejecuta stress test (1018 conns, 30s)"
 
 # Crear directorios si no existen
 $(SERVER_BIN): $(ALL_OBJ)
