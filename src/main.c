@@ -43,7 +43,7 @@ struct socks5args args;
 
 static void
 sigterm_handler(const int signal) {
-    printf("signal %d, cleaning up and exiting\n",signal);
+    logf(LOG_INFO, "signal %d, cleaning up and exiting", signal);
     done = true;
 }
 
@@ -108,7 +108,6 @@ main(const int argc, char **argv) {
         goto finally;
     }
 
-    fprintf(stdout, "Listening on TCP port %d (address: %s)\n", args.socks_port, args.socks_addr);
     logf(LOG_OUTPUT, "Escuchando puerto TCP %d en %s", args.socks_port, args.socks_addr);
 
     // man 7 ip. no importa reportar nada si falla.
@@ -193,7 +192,7 @@ main(const int argc, char **argv) {
         goto finally;
     }
     
-    fprintf(stderr, "Management server listening on %s:%d\n", args.mng_addr, args.mng_port);
+    logf(LOG_OUTPUT, "Management server listening on %s:%d", args.mng_addr, args.mng_port);
     // ===== END MANAGEMENT SOCKET =====
     
     for(;!done;) {
