@@ -14,7 +14,9 @@ void metrics_login(void){
 }
 
 void metrics_logout(void){
-    stats.current_connections --;
+    if(stats.current_connections > 0) {
+        stats.current_connections--;
+    }
 }
 
 void metrics_update(size_t bytes_sent, size_t bytes_recieved){

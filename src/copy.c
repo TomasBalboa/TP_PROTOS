@@ -102,11 +102,16 @@ static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer){
     }
     buffer_write_adv(buffer, bytes_read);
     
+    // Contar bytes RECIBIDOS por el proxy
+    metrics_update(0, bytes_read);
+    
     uint8_t *write = buffer_read_ptr(buffer, &available_space);
     ssize_t bytes_written = send(fd, write, available_space, MSG_NOSIGNAL);
 
     if(bytes_written > 0){
         buffer_read_adv(buffer, bytes_written);
+        // Contar bytes ENVIADOS por el proxy
+        metrics_update(bytes_written, 0);
     }
 
     if(buffer_can_read(buffer) || (bytes_written < 0 && errno == EWOULDBLOCK)){
@@ -132,11 +137,8 @@ static unsigned write_aux(struct selector_key *key, buffer *buffer, bool is_clie
     }
 
     logf(LOG_DEBUG,"write_aux (copy.c): se envió %ld bytes de los %lu que pudo mandar",bytes_written,available_space);
-    if(is_client){
-        metrics_update(0,bytes_written);
-    }else{
-        metrics_update(bytes_written,0);
-    }
+    // Contar bytes ENVIADOS por el proxy
+    metrics_update(bytes_written, 0);
 
     buffer_read_adv(buffer, bytes_written);
 

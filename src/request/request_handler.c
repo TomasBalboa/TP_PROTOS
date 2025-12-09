@@ -129,7 +129,7 @@ unsigned request_try_connect(struct selector_key *key) {
                                 hostbuf, sizeof(hostbuf),
                                 portbuf, sizeof(portbuf),
                                 NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
-                    char dest[128];
+                    char dest[NI_MAXHOST + NI_MAXSERV + 2];  /* +2 para ':' y '\0' */
                     snprintf(dest, sizeof(dest), "%s:%s", hostbuf, portbuf);
                     users_add_access_log(s->username, dest);
                 }

@@ -217,7 +217,10 @@ fail:
     if(client != -1) {
         close(client);
     }
-    socks5_destroy(state);
+    // NO llamar socks5_destroy aquí porque metrics_login() no se llamó
+    if(state != NULL) {
+        free(state);  // Liberar directamente sin metrics_logout
+    }
 }
 ////////////////////////////////////////////////////////////////////////////////
 // REQUEST

@@ -146,3 +146,17 @@ Salida esperada (cada cliente imprimirá la respuesta hex):
 1 reply 05020100
 ...
 ```
+
+5. Ejecutar test de performance
+
+Correr Servidor: ./bin/socks5d
+
+
+'''bash
+curl -x socks5://localhost:1080 -o sintel_trailer.mp4 \
+  "http://ftp.Halifax.RWTH-Aachen.DE/blender/demo/movies/ToS/ToS-4k-1920.mov"
+
+en otra terminal: ./mgmt_client.py stats 
+
+'''
+
