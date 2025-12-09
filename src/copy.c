@@ -12,7 +12,7 @@
 #include "./include/logging.h"
 
 // static fd_interest copy_compute_interests(fd_selector s, struct copy *d);
-static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer);
+static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer, bool is_client);
 static unsigned write_aux(struct selector_key *key, buffer *buffer, bool is_client);
 
 /**
@@ -65,18 +65,16 @@ void copy_init(const unsigned state, struct selector_key *key) {
 
 unsigned copy_read(struct selector_key *key) {
     struct client_info *s = ATTACHMENT(key);
-
     if (key->fd == s->client_fd) {
-        return read_aux(key,s->origin_fd,&s->origin_buffer);
+        return read_aux(key,s->origin_fd,&s->origin_buffer, true);
     } else if (key->fd == s->origin_fd) {
-        return read_aux(key,s->client_fd,&s->client_buffer);
+        return read_aux(key,s->client_fd,&s->client_buffer, false);
     }
     return ERROR;
 }
 
 unsigned copy_write(struct selector_key *key) {
     struct client_info *s = ATTACHMENT(key);
-
     if (key->fd == s->client_fd) {
         return write_aux(key,&s->client_buffer,true);
     } else if (key->fd == s->origin_fd) {
@@ -85,7 +83,7 @@ unsigned copy_write(struct selector_key *key) {
     return ERROR;
 }
 
-static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer){
+static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer, bool is_client){
     if(!buffer_can_write(buffer)){
         return COPY;
     }
@@ -93,7 +91,7 @@ static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer){
     size_t available_space;
     uint8_t *read = buffer_write_ptr(buffer, &available_space);
     ssize_t bytes_read = recv(key->fd, read, available_space, 0);
-
+    logf(LOG_DEBUG, "se leyeron %d bytes", (int)bytes_read);
     if(bytes_read < 0) {
         // perror("reading failed");
         return ERROR;
@@ -102,16 +100,16 @@ static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer){
     }
     buffer_write_adv(buffer, bytes_read);
     
-    // Contar bytes RECIBIDOS por el proxy
-    metrics_update(0, bytes_read);
-    
     uint8_t *write = buffer_read_ptr(buffer, &available_space);
     ssize_t bytes_written = send(fd, write, available_space, MSG_NOSIGNAL);
 
     if(bytes_written > 0){
         buffer_read_adv(buffer, bytes_written);
-        // Contar bytes ENVIADOS por el proxy
-        metrics_update(bytes_written, 0);
+        if(is_client){
+            metrics_update(0,bytes_written);
+        }else{
+            metrics_update(bytes_written,0);
+        }
     }
 
     if(buffer_can_read(buffer) || (bytes_written < 0 && errno == EWOULDBLOCK)){
@@ -137,8 +135,11 @@ static unsigned write_aux(struct selector_key *key, buffer *buffer, bool is_clie
     }
 
     logf(LOG_DEBUG,"write_aux (copy.c): se envió %ld bytes de los %lu que pudo mandar",bytes_written,available_space);
-    // Contar bytes ENVIADOS por el proxy
-    metrics_update(bytes_written, 0);
+    if(is_client){
+        metrics_update(0,bytes_written);
+    }else{
+        metrics_update(bytes_written,0);
+    }
 
     buffer_read_adv(buffer, bytes_written);
 

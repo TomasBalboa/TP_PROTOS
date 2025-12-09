@@ -89,7 +89,7 @@ main(const int argc, char **argv) {
     }
 
     loggerInit(selector,"",stdout);
-    loggerSetLevel(LOG_DEBUG);  // Cambiar a LOG_DEBUG para ver todos los logs
+    loggerSetLevel(LOG_DEBUG);
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
