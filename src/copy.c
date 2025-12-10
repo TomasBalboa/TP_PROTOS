@@ -121,7 +121,6 @@ static unsigned read_aux(struct selector_key *key, int fd, buffer *buffer, bool 
 }
 
 static unsigned write_aux(struct selector_key *key, buffer *buffer, bool is_client){
-    (void)is_client;
     if(!buffer_can_read(buffer)){
         return COPY;
     }
