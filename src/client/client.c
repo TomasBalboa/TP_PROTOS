@@ -5,17 +5,34 @@
 #define DEFAULT_PORT "8080"
 
 int main(int argc, char* argv[]){
-    if(argc < 4){
-        fprintf(stderr, "Usage: %s <host> <port> <command> (args)\n"
-            "\tTo know more about the commands, try 'help' or '-h'\n"
-            "\tUse '$' as host or port if you wish to use the default values (localhost and 8080)\n", argv[0]);
+    if(argc < 6){
+        fprintf(stderr, "Usage: %s <host> <port> <username> <password> <command> [args]\n"
+            "\tYou can use 'default' for host or port to use default values (localhost and 8080)\n\n"
+            "Available commands:\n"
+            "  HELP                                                        - Show all commands\n"
+            "  LIST_USERS                                                  - List all users\n"
+            "  STATS                                                       - Show server statistics\n"
+            "  ADD_USER <username> <password>                  (admin only) - Register a new user\n"
+            "  DELETE_USER <username>                          (admin only) - Delete a user\n"
+            "  CHANGE_PASSWORD <username> <new_password>       (admin only) - Change user password\n"
+            "  CHANGE_ROLE <username> <admin|user>             (admin only) - Change user role\n"
+            "  AUDIT_USER <username>                           (admin only) - Show user activity log\n"
+            "  GET_DEFAULT_AUTH                                            - Get current auth method\n"
+            "  SET_DEFAULT_AUTH <no_auth|username_password>    (admin only) - Set default auth method\n"
+            "\n"
+            "Command aliases for convenience:\n"
+            "  help, users, stats, add, del, chpwd, chrol, audit, gauth, sauth\n"
+            "\n", argv[0]);
         return 1;
     }
     
-    const char* host = strcmp(argv[1], "$") == 0 ? DEFAULT_HOST : argv[1];
-    const char* port = strcmp(argv[2], "$") == 0 ? DEFAULT_PORT : argv[2];
+    const char* host = strcmp(argv[1], "def") == 0 ? DEFAULT_HOST : argv[1]; //def --> default
+    const char* port = strcmp(argv[2], "def") == 0 ? DEFAULT_PORT : argv[2]; //def --> default
+    const char* username = argv[3];
+    const char* password = argv[4];
+    const char* command = argv[5];
     
-    if(!strcmp(argv[3],"-h") || !strcmp(argv[3],"help")){
+    if(!strcmp(command,"-h") || !strcmp(command,"help")){
         cmd_print_help(0,0,NULL);
         return 0;
     }
@@ -27,21 +44,21 @@ int main(int argc, char* argv[]){
         return 1;
     }
     
-    // Autenticar
-    if(!client_authenticate(socket, "admin", "0000")){
-        fprintf(stderr, "Error: Authentication failed\n");
+    // Autenticar con las credenciales proporcionadas
+    if(!client_authenticate(socket, username, password)){
+        fprintf(stderr, "Error: Authentication failed for user '%s'\n", username);
         client_close_socket(socket);
         return 1;
     }
     
     for( int i = 0; i < CLIENT_CMD_SIZE; i++){
-        if(!strcmp(argv[3],commands[i].name)){
-            if(argc - 4 != commands[i].argc){
-                fprintf(stderr, "Wrong number of arguments\n\tProvided: %d\n\tExpected: %d\n", argc - 4, commands[i].argc);
+        if(!strcmp(command,commands[i].name)){
+            if(argc - 6 != commands[i].argc){
+                fprintf(stderr, "Wrong number of arguments\n\tProvided: %d\n\tExpected: %d\n", argc - 6, commands[i].argc);
                 client_close_socket(socket);
                 return 1;
             }
-            int result = commands[i].command(socket, argc-4, argv + 4);
+            int result = commands[i].command(socket, argc-6, argv + 6);
             client_close_socket(socket);
             return result ? 0 : 1;
         }

@@ -36,7 +36,7 @@ void client_close_socket(int fd);
  * @param pwd contraseña
  * @return true si autenticó, false si no
  */
-bool client_authenticate(int fd, char* uname, char* pwd);
+bool client_authenticate(int fd, const char* uname, const char* pwd);
 
 /**
  * @brief envía un comando al servidor de management

@@ -193,6 +193,7 @@ main(const int argc, char **argv) {
     }
     
     logf(LOG_OUTPUT, "Management server listening on %s:%d", args.mng_addr, args.mng_port);
+    logf(LOG_OUTPUT, "Default admin user: %s / %s", DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD);
     // ===== END MANAGEMENT SOCKET =====
     
     for(;!done;) {

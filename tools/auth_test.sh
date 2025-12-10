@@ -4,11 +4,11 @@
 #Pido ayuda a GPT
 
 HOST=${1-localhost}
-PORT=${2-9090}
+PORT=${2-1080}
 
 # HELLO then AUTH with small sleep between
 echo "Sending HELLO + AUTH to ${HOST}:${PORT}"
-{ printf '\x05\x01\x02'; sleep 0.1; printf '\x01\x04user\x04pass'; } | nc -N ${HOST} ${PORT} | xxd -p -c 256
+{ printf '\x05\x01\x02'; sleep 0.1; printf '\x01\x05admin\x040000'; } | nc -N ${HOST} ${PORT} | xxd -p -c 256
 
 echo "Done"
 

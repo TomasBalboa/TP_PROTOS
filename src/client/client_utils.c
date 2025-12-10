@@ -46,7 +46,7 @@ void client_close_socket(int fd){
         close(fd);
 }
 
-bool client_authenticate(int fd, char* uname, char* pwd){
+bool client_authenticate(int fd, const char* uname, const char* pwd){
     int ulen = strlen(uname);
     int plen = strlen(pwd);
     if(ulen > 255 || plen > 255) return false;
