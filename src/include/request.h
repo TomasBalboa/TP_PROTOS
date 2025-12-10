@@ -30,7 +30,8 @@ enum request_state {
     REQUEST_PORT_HIGH,
     REQUEST_PORT_LOW,
     REQUEST_DONE,
-    REQUEST_ERROR
+    REQUEST_ERROR,
+    REQUEST_ERROR_CMD_NOT_SUPPORTED
 };
 
 struct request_parser {

@@ -22,8 +22,10 @@ bool request_parser_parse(struct request_parser *p, buffer *buf) {
                 
             case REQUEST_CMD:
                 p->cmd = byte;
-                // Solo soportamos CONNECT por ahora
-                if (byte != SOCKS5_CMD_CONNECT) {
+                if (byte == SOCKS5_CMD_BIND || byte == SOCKS5_CMD_UDP_ASSOCIATE) {
+                    p->state = REQUEST_ERROR_CMD_NOT_SUPPORTED;
+                    return false;
+                } else if (byte != SOCKS5_CMD_CONNECT) {
                     p->state = REQUEST_ERROR;
                     return false;
                 }
@@ -106,6 +108,7 @@ bool request_parser_parse(struct request_parser *p, buffer *buf) {
                 
             case REQUEST_DONE:
             case REQUEST_ERROR:
+            case REQUEST_ERROR_CMD_NOT_SUPPORTED:
                 return false;
         }
     }
@@ -136,8 +139,11 @@ enum request_state request_consume(buffer *buf, struct request_parser *p, bool *
                 
             case REQUEST_CMD:
                 p->cmd = byte;
-                // Solo soportamos CONNECT por ahora
-                if (byte != SOCKS5_CMD_CONNECT) {
+                if (byte == SOCKS5_CMD_BIND || byte == SOCKS5_CMD_UDP_ASSOCIATE) {
+                    p->state = REQUEST_ERROR_CMD_NOT_SUPPORTED;
+                    *errored = true;
+                    return p->state;
+                } else if (byte != SOCKS5_CMD_CONNECT) {
                     p->state = REQUEST_ERROR;
                     *errored = true;
                     return p->state;
@@ -224,6 +230,7 @@ enum request_state request_consume(buffer *buf, struct request_parser *p, bool *
                 
             case REQUEST_DONE:
             case REQUEST_ERROR:
+            case REQUEST_ERROR_CMD_NOT_SUPPORTED:
                 return p->state;
         }
     }
@@ -232,11 +239,11 @@ enum request_state request_consume(buffer *buf, struct request_parser *p, bool *
 }
 
 bool request_is_done(enum request_state state) {
-    return state == REQUEST_DONE || state == REQUEST_ERROR;
+    return state == REQUEST_DONE || state == REQUEST_ERROR || state == REQUEST_ERROR_CMD_NOT_SUPPORTED;
 }
 
 bool request_has_error(enum request_state state) {
-    return state == REQUEST_ERROR;
+    return state == REQUEST_ERROR || state == REQUEST_ERROR_CMD_NOT_SUPPORTED;
 }
 
 int request_write_response(uint8_t *buffer, 

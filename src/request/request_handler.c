@@ -334,17 +334,17 @@ unsigned request_read(struct selector_key *key) {
         
         logf(LOG_DEBUG, "[REQUEST] parser state=%d error=%d fd=%d", st, error, key->fd);
         
-        if(st == REQUEST_ERROR) {
-            /* Parser detectó request inválido */
+        if(st == REQUEST_ERROR_CMD_NOT_SUPPORTED) {
+            d->reply = SOCKS5_REPLY_CMD_NOT_SUPPORTED;
+        } else if(st == REQUEST_ERROR) {
             d->reply = SOCKS5_REPLY_GENERAL_FAILURE;
-            
-            struct in_addr bind_addr;
-            bind_addr.s_addr = INADDR_ANY;
-            
+        }
+        
+        if(st == REQUEST_ERROR_CMD_NOT_SUPPORTED || st == REQUEST_ERROR) {
+            struct in_addr bind_addr = {.s_addr = INADDR_ANY};
             size_t nbytes;
             uint8_t *wptr = buffer_write_ptr(d->wb, &nbytes);
-            int written = request_write_response(wptr, d->reply, &bind_addr, 0);
-            buffer_write_adv(d->wb, written);
+            buffer_write_adv(d->wb, request_write_response(wptr, d->reply, &bind_addr, 0));
             
             if (SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
                 ret = REQUEST_WRITE;
@@ -361,7 +361,7 @@ unsigned request_read(struct selector_key *key) {
     }
 
     logf(LOG_DEBUG, "[REQUEST] request_read returning state=%d fd=%d", ret, key->fd);
-    return error ? ERROR : ret;
+    return ret;
 }
 
 /* Escribe la respuesta del request al cliente */
