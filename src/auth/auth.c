@@ -83,10 +83,18 @@ unsigned auth_write(struct selector_key *key) {
         logf(LOG_DEBUG, "[AUTH] auth_write fd=%d wrote=%zd bytes", key->fd, n);
         buffer_read_adv(d->wb, n);
         if (!buffer_can_read(d->wb)) {
-            if (SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
-                ret = REQUEST_READ;  // Pasar al siguiente estado
-            } else {
+            // Respuesta enviada completamente
+            if (ATTACHMENT(key)->auth_failed) {
+                // Autenticación falló, cerrar conexión
+                logf(LOG_INFO, "[AUTH] fd=%d Auth failed, closing connection after sending response", key->fd);
                 ret = ERROR;
+            } else {
+                // Autenticación exitosa, continuar al siguiente estado
+                if (SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
+                    ret = REQUEST_READ;
+                } else {
+                    ret = ERROR;
+                }
             }
         }
     }
@@ -130,8 +138,10 @@ static unsigned auth_process(struct selector_key *key, const struct auth_st *d) 
         strncpy(ATTACHMENT(key)->username, d->parser.username,
                 sizeof(ATTACHMENT(key)->username) - 1);
         ATTACHMENT(key)->username[sizeof(ATTACHMENT(key)->username) - 1] = '\0';
-        return AUTH_WRITE;
-    } else {
-        return ERROR;  // Rechazar conexión
     }
+    
+    // Marcar si auth falló para cerrar después de escribir
+    ATTACHMENT(key)->auth_failed = !auth_ok;
+    
+    return AUTH_WRITE;
 }

@@ -79,11 +79,26 @@ def test_socks5_auth(proxy_host, proxy_port, user=None, password=None):
         return False
 
 if __name__ == '__main__':
+    # Parse command line arguments
+    if len(sys.argv) >= 5:
+        host = sys.argv[1]
+        port = int(sys.argv[2])
+        user = sys.argv[3]
+        password = sys.argv[4]
+    else:
+        # Default values
+        host = 'localhost'
+        port = 1080
+        user = 'rocky'
+        password = 'julii'
+    
+    print(f"\nTesting with: {host}:{port}, user={user}, pass={password}")
+    
     print("\n=== Test 1: NO credentials (NO_AUTH) ===")
-    test_socks5_auth('localhost', 1080)
+    test_socks5_auth(host, port)
     
-    print("\n=== Test 2: Valid credentials ===")
-    test_socks5_auth('localhost', 1080, 'rocky', 'julii')
+    print(f"\n=== Test 2: Valid credentials ({user}:{password}) ===")
+    test_socks5_auth(host, port, user, password)
     
-    print("\n=== Test 3: Invalid credentials ===")
-    test_socks5_auth('localhost', 1080, 'rocky', 'WRONG_PASSWORD')
+    print(f"\n=== Test 3: Invalid credentials ({user}:WRONG_PASSWORD) ===")
+    test_socks5_auth(host, port, user, 'WRONG_PASSWORD')

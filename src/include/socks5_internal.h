@@ -118,7 +118,7 @@ struct client_info {
     /** Selector */
     fd_selector             selector;
     /** Flags */
-    bool                    is_closed, is_admin, access_registered;
+    bool                    is_closed, is_admin, access_registered, auth_failed;
     /** Username para autenticación */
     char                    username[65];
 };
