@@ -128,11 +128,6 @@ unsigned mgmt_command_write(struct selector_key *key) {
     }
 
     // Por simplicidad cerramos la conexión tras responder un comando.
-    // Si quisieras soportar múltiples comandos por conexión, en lugar
-    // de cerrar deberías:
-    //  - re‑inicializar el parser
-    //  - cambiar el interés a OP_READ
-    //  - devolver MANAGMENT_REQUEST_READ
     return MANAGMENT_CLOSED;
 }
 
