@@ -7,7 +7,7 @@
 int main(int argc, char* argv[]){
     if(argc < 6){
         fprintf(stderr, "Usage: %s <host> <port> <username> <password> <command> [args]\n"
-            "\tYou can use 'default' for host or port to use default values (localhost and 8080)\n\n"
+            "\tYou can use 'def' for host or port to use default values (localhost and 8080)\n\n"
             "Available commands:\n"
             "  HELP                                                        - Show all commands\n"
             "  LIST_USERS                                                  - List all users\n"
