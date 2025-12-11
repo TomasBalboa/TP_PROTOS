@@ -1,162 +1,168 @@
-# TP_PROTOS - Servidor Proxy SOCKS5
+# TP_PROTOS – Servidor SOCKS5 + Cliente de Management
 
-Implementación de un servidor proxy SOCKS5 según RFC 1928 con autenticación de usuario/contraseña (RFC 1929).
+Este proyecto implementa:
 
-## Requisitos
+- Un **servidor proxy SOCKS5** no bloqueante (`bin/socks5d`), con soporte de autenticación RFC 1929 y canal de management propio.
+- Un **cliente de management en C** (`bin/client`) para administrar el servidor (usuarios, estadísticas, método de autenticación, auditoría, etc.).
+- Scripts de prueba y stress en `tools/`.
 
-- Sistema operativo: Linux/macOS
-- Compilador: `gcc` con soporte para C11
-- Estándares: ISO/IEC 9899:2011 (C11), IEEE Std 1003.1-2008 (POSIX)
+## 1. ¿Cómo compilar?
 
-## Compilación
-
-Para compilar el proyecto:
+Desde la raíz del proyecto:
 
 ```bash
-make
+make clean      # Limpia binarios previos
+make all        # Compila servidor 
+make client     # Compila el cliente
+make test       # (Opcional) Compila y ejecuta tests unitarios
 ```
 
-Para limpiar los archivos compilados:
+Esto genera:
+
+- `bin/socks5d` – Servidor SOCKS5 + management
+- `bin/client`  – Cliente de management en C
+
+Los tests unitarios se generan (y ejecutan) en `bin/test/*` cuando se usa `make test`.
+
+---
+## 2. ¿Cómo correr el servidor SOCKS5?
+
+Sintaxis básica:
 
 ```bash
-make clean
+./bin/socks5d [opciones]
 ```
 
-El ejecutable se generará en `bin/socks5d`.
+Opciones más importantes:
 
-## Uso
+- `-l <SOCKS_ADDR>`  Dirección donde escucha SOCKS5 (default `0.0.0.0`)
+- `-p <SOCKS_PORT>`  Puerto SOCKS5 (default `1080`)
+- `-L <CONF_ADDR>`   Dirección del canal de management (default `127.0.0.1`)
+- `-P <CONF_PORT>`   Puerto de management (default `8080`)
+- `-u <user:pass>`   Agrega usuario (puede repetirse)
+- `-N`               Deshabilita disectors
+- `-v`               Muestra versión y termina
 
-### Sintaxis básica
+Ejemplo mínimo:
 
-```bash
-./bin/socks5d [OPCIONES]
-```
-
-### Opciones disponibles
-
-| Opción | Parámetro | Descripción | Por defecto |
-|--------|-----------|-------------|-------------|
-| `-h` | - | Imprime ayuda y termina | - |
-| `-l` | SOCKS_ADDR | Dirección IP donde escucha el servidor SOCKS | `0.0.0.0` |
-| `-L` | CONF_ADDR | Dirección IP donde escucha el servidor de configuración | `127.0.0.1` |
-| `-N` | - | Deshabilita passwords disectors | Habilitado |
-| `-p` | SOCKS_PORT | Puerto TCP donde escucha el servidor SOCKS | `1080` |
-| `-P` | CONF_PORT | Puerto TCP donde escucha el servidor de configuración | `8080` |
-| `-u` | USER:PASS | Usuario y contraseña para autenticación (puede repetirse) | - |
-| `-v` | - | Imprime información sobre la versión y termina | - |
-
-### Ejemplos
-
-#### Ejecutar con configuración por defecto
 ```bash
 ./bin/socks5d
 ```
-El servidor escuchará en `0.0.0.0:1080` sin autenticación.
 
-#### Ejecutar con IP y puerto específicos
-```bash
-./bin/socks5d -l 127.0.0.1 -p 9090
-```
-El servidor escuchará solo en `127.0.0.1:9090`.
-
-#### Ejecutar con autenticación
-```bash
-./bin/socks5d -l 127.0.0.1 -p 1080 -u admin:password123 -u user:pass456
-```
-El servidor aceptará dos usuarios: `admin` con contraseña `password123` y `user` con contraseña `pass456`.
-
-#### Configuración completa
-```bash
-./bin/socks5d -l 0.0.0.0 -p 1080 -L 127.0.0.1 -P 8080 -u admin:secret
-```
-- Servidor SOCKS5: `0.0.0.0:1080` (todas las interfaces)
-- Servidor de configuración: `127.0.0.1:8080` (solo local)
-- Usuario: `admin` con contraseña `secret`
-
-## Probar el servidor
-
-### Con curl (usando SOCKS5)
-```bash
-curl --socks5 127.0.0.1:1080 http://example.com
-```
-
-### Con autenticación
-```bash
-curl --socks5 admin:password123@127.0.0.1:1080 http://example.com
-```
-
-### Configurar navegador
-1. Firefox: Preferences → Network Settings → Manual proxy configuration
-2. SOCKS Host: `127.0.0.1`
-3. Port: `1080`
-4. SOCKS v5
-
-## Logs
-
-Los logs del servidor se guardan en el directorio `log/` con el formato `DD-MM-YYYY.log`.
-
-## Pruebas incluidas (auth + stress)
-
-En el directorio `tools/` hay dos utilidades para probar rápidamente el proxy:
-
-- `auth_test.sh` (smoke): envía un HELLO (SOCKS5) y una sub-negociación USER/PASS y muestra la respuesta en hex.
-- `stress_clients.py`: script Python `asyncio` para abrir N clientes concurrentes que ejecutan HELLO+AUTH y mantienen la conexión.
-
-Cómo prepararlas:
-
-1. Compilar servidor y dejarlo corriendo en otra terminal:
+Ejemplo con usuarios explícitos:
 
 ```bash
-make all
-./bin/socks5d -p 9090
+./bin/socks5d -l 0.0.0.0 -p 1080 -L 127.0.0.1 -P 8080 \
+  -u admin:0000 -u tincho:1234
 ```
 
-2. Hacer ejecutables los scripts (opcional, `make tools` intenta hacerlo):
+Usuario admin por defecto (si no se sobreescribe con `-u`):
+
+- Usuario: `admin`
+- Contraseña: `0000`
+
+---
+## 3. ¿Cómo usar el proxy SOCKS5?
+
+Con `curl` sin auth (está permitido por configuración):
 
 ```bash
-make tools
-chmod +x tools/*.sh tools/*.py
+curl -x "socks5h://127.0.0.1:1080" http://example.com
 ```
 
-3. Ejecutar el auth test:
+Con autenticación usuario/contraseña:
 
 ```bash
- ./tools/auth_test.sh localhost 9090
-
+curl -x "socks5h://admin:0000@127.0.0.1:1080" http://example.com
 ```
 
-Salida esperada (hex):
+Configuración típica por defecto (usando: def def):
 
-```
-05020100
-```
-4. Ejecutar el stress test (concurrencia)
+- SOCKS Host: `127.0.0.1`
+- Port: `1080`
+- SOCKS v5
+
+---
+## 4. Cliente de management (C)
+
+### 4.1. ¿Qué es?
+
+Un cliente en C para el protocolo de management del servidor. Permite:
+
+- Autenticarse con usuario/contraseña.
+- Listar, agregar y eliminar usuarios.
+- Cambiar el rol (admin/user) de un usuario.
+- Consultar estadísticas del servidor.
+- Ver el historial de actividad de un usuario.
+- Consultar y cambiar el método de autenticación por defecto.
+
+### 4.2. Ejecución
+
+Sintaxis:
 
 ```bash
-# Aumentar temporalmente el límite de ficheros si es necesario
-ulimit -n 10000
-
-python3 tools/stress_clients.py 500 127.0.0.1 9090 30
+./bin/client <host> <port> <username> <password> <command> [args]
 ```
 
-Salida esperada (cada cliente imprimirá la respuesta hex):
+Atajo: usar `def` como host o puerto para tomar `localhost` y `8080`:
 
-```
-0 reply 05020100
-1 reply 05020100
-...
+```bash
+./bin/client def def admin 0000 stats
 ```
 
-5. Ejecutar test de performance
+Comandos principales (y alias):
 
-Correr Servidor: ./bin/socks5d
+- `help` / `-h`                  – Muestra ayuda local.
+- `users`                        – Lista usuarios.
+- `stats`                        – Muestra estadísticas del servidor.
+- `add <UNAME> <PWD>`            – Agrega usuario (admin only).
+- `del <UNAME>`                  – Elimina usuario (admin only).
+- `chrol <UNAME> <admin|user>`   – Cambia rol (admin only).
+- `audit <UNAME>`                – Muestra auditoría del usuario (admin only).
+- `gauth` / `sauth <modo>`       – Get/set método de auth por defecto.
 
+Ejemplos:
 
-'''bash
-curl -x socks5://localhost:1080 -o sintel_trailer.mp4 \
-  "http://ftp.Halifax.RWTH-Aachen.DE/blender/demo/movies/ToS/ToS-4k-1920.mov"
+```bash
+# Listar usuarios
+./bin/client def def admin 0000 users
 
-en otra terminal: ./mgmt_client.py stats 
+# Crear usuario normal
+./bin/client def def admin 0000 add tincho 1234
 
-'''
+# Ver actividad de un usuario
+./bin/client def def admin 0000 audit tincho
+```
 
+---
+## 5. Scripts de stress y pruebas (tools/)
+
+Todos los scripts están en `tools/`. Antes de usarlos:
+
+```bash
+chmod +x tools/*.sh
+```
+
+Algunos scripts relevantes:
+
+- `tools/auth_test.sh`  – Prueba rápida de handshake + auth SOCKS5.
+- `tools/testConections.sh` – Lanza ~500 conexiones vía `curl` con auth.
+- `tools/integratedTest.sh` – Stress test integrado (usa `CONNECTIONS` y `CONCURRENCY` configurables).
+
+Ejecución típica del integrated test (con el servidor en `127.0.0.1:1080`):
+
+```bash
+./tools/integratedTest.sh
+```
+
+Genera:
+
+- `tools/stress_results_YYYYMMDD_HHMMSS.log`
+- `tools/stress_summary_YYYYMMDD_HHMMSS.txt`
+
+---
+## 6. Notas
+
+- El cliente de management requiere autenticación para todos los comandos (salvo `help`).
+- El servidor debe estar corriendo y accesible en la IP/puerto configurados antes de usar `bin/client` o los scripts de stress.
+- Para detalles internos (FSM, parsers, protocolo de management), ver el informe del TP.
