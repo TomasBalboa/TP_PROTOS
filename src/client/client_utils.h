@@ -13,7 +13,7 @@
 #include <errno.h>
 
 #define AUP_VERSION 1
-#define MAX_AUP_REQUEST_SIZE 513
+#define MAX_AUP_REQUEST_SIZE 131
 
 /**
  * @brief crea socket y se conecta

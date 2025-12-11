@@ -49,7 +49,7 @@ void client_close_socket(int fd){
 bool client_authenticate(int fd, const char* uname, const char* pwd){
     int ulen = strlen(uname);
     int plen = strlen(pwd);
-    if(ulen > 255 || plen > 255) return false;
+    if(ulen > 64 || plen > 64) return false;
 
     uint8_t request[MAX_AUP_REQUEST_SIZE] = {AUP_VERSION, ulen};
     int offset = 2;
