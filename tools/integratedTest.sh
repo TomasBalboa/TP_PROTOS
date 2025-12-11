@@ -25,7 +25,7 @@ URLS_JOINED=$(IFS='|'; echo "${URLS[*]}")
 
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 LOGFILE="stress_results_${TIMESTAMP}.log"
-SUMMARYFILE="stress_summary_${TIMESTAMP}.txt"
+SUMMARYFILE="stress_summary_${TIMESTAMP}.log"
 
 echo "== SOCKSv5 integrated stress test =="
 echo "Proxy: $SERVER:$PORT (no auth)"
