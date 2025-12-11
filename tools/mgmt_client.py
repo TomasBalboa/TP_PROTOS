@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 (ya se puede probar directamente desde client)
 """
 - Auth (RFC 1929): [VER=0x01][ULEN][USERNAME][PLEN][PASSWORD]
 - Command: [VER=0x01][CMD][LEN][PAYLOAD] where PAYLOAD is ASCII args

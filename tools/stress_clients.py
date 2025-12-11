@@ -63,3 +63,5 @@ if __name__ == '__main__':
 #ss -p | grep socks5d
 # uso de CPU/RAM
 #top -p $(pgrep -d',' socks5d)
+
+#mismo test que stress_test.sh

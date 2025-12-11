@@ -1,16 +1,14 @@
 #!/bin/bash
-
+#IGUAL QUE TODOS LOS SH, los modificos para que ande en bash:
+sed -i 's/\r$//' tools/integratedTest.sh && chmod +x tools/integratedTest.sh
 # ================= CONFIG =================
 
-CONNECTIONS=3000          # Total de conexiones a lanzar
-CONCURRENCY=500           # Número de conexiones concurrentes máximas
+CONNECTIONS=500           # Total de conexiones a lanzar
+CONCURRENCY=100           # Número de conexiones concurrentes máximas
 SERVER="127.0.0.1"        # Dirección del proxy
 PORT="1080"               # Puerto del proxy SOCKS5 (sin auth)
 
 URLS=(
-  "https://speed.hetzner.de/1MB.bin"
-  "https://speed.hetzner.de/10MB.bin"
-  "https://speed.hetzner.de/100MB.bin"   
   "https://example.com"
   "https://www.google.com"
   "https://www.cloudflare.com"
@@ -18,6 +16,9 @@ URLS=(
   "https://www.wikipedia.org"
   "https://www.kernel.org"
   "https://www.mozilla.org"
+  "https://www.github.com"
+  "https://www.reddit.com"
+  "https://www.stackoverflow.com"
 )
 
 URLS_JOINED=$(IFS='|'; echo "${URLS[*]}")

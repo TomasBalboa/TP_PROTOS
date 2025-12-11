@@ -210,9 +210,12 @@ items_init(fd_selector s, const size_t last) {
 static int
 items_max_fd(fd_selector s) {
     int max = 0;
-    for(int i = 0; i <= s->max_fd; i++) {
+    // Me aseguro que no iteramos más allá del tamaño asignado
+    int limit = (s->max_fd < (int)s->fd_size) ? s->max_fd : (int)s->fd_size - 1;
+    
+    for(int i = 0; i <= limit; i++) {
         struct item *item = s->fds + i;
-        if(ITEM_USED(item)) {
+        if(ITEM_USED(item) && item->fd >= 0) {
             if(item->fd > max) {
                 max = item->fd;
             }
@@ -455,8 +458,18 @@ handle_iteration(fd_selector s) {
     };
 
     for (int i = 0; i <= n; i++) {
+        // Validar que el índice esté dentro del rango asignado
+        if ((size_t)i >= s->fd_size) {
+            break;
+        }
+        
         struct item *item = s->fds + i;
         if(ITEM_USED(item)) {
+            // Validar que el fd sea válido antes de usarlo
+            if(item->fd < 0) {
+                continue;
+            }
+            
             key.fd   = item->fd;
             key.data = item->data;
             if(FD_ISSET(item->fd, &s->slave_r)) {
@@ -468,6 +481,12 @@ handle_iteration(fd_selector s) {
                     }
                 }
             }
+            // Re-verificar que el item sigue siendo válido después de handle_read
+            // ya que puede haber sido desregistrado
+            if(!ITEM_USED(item) || item->fd < 0) {
+                continue;
+            }
+            
             if(FD_ISSET(item->fd, &s->slave_w)) {
                 if(OP_WRITE & item->interest) {
                     if(0 == item->handler->handle_write) {
@@ -555,10 +574,16 @@ selector_select(fd_selector s) {
             case EBADF:
                 // ayuda a encontrar casos donde se cierran los fd pero no
                 // se desregistraron
-                for(int i = 0 ; i < s->max_fd; i++) {
-                    if(FD_ISSET(i, &s->master_r)|| FD_ISSET(i, &s->master_w)) {
-                        if(-1 == fcntl(i, F_GETFD, 0)) {
-                            fprintf(stderr, "Bad descriptor detected: %d\n", i);
+                {
+                    int limit = (s->max_fd < (int)s->fd_size) ? s->max_fd : (int)s->fd_size - 1;
+                    for(int i = 0 ; i <= limit; i++) {
+                        if(FD_ISSET(i, &s->master_r)|| FD_ISSET(i, &s->master_w)) {
+                            if(-1 == fcntl(i, F_GETFD, 0)) {
+                                fprintf(stderr, "Bad descriptor detected: %d\n", i);
+                                // Limpiar el descriptor malo de los fd_sets
+                                FD_CLR(i, &s->master_r);
+                                FD_CLR(i, &s->master_w);
+                            }
                         }
                     }
                 }

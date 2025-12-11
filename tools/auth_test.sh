@@ -12,7 +12,8 @@ echo "Sending HELLO + AUTH to ${HOST}:${PORT}"
 
 echo "Done"
 
-
+#CONVERTÍ DE WINDOWS A UNIX CON:
+# dos2unix tools/auth_test.sh 2>/dev/null || sed -i 's/\r$//' tools/auth_test.sh
 #Por ahora explicación:
 #El primer printf envía el HELLO:
 #- \x05: versión SOCKS5

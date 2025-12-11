@@ -99,6 +99,14 @@ unsigned request_try_connect(struct selector_key *key) {
             s->current_resolution = s->current_resolution->ai_next;
             continue;
         }
+        
+        /* Verifico que el FD esté dentro del límite de select() */
+        if (origin_fd >= FD_SETSIZE) {
+            logf(LOG_WARNING, "[REQUEST] origin_fd=%d excede FD_SETSIZE (%d), rechazando conexión", origin_fd, FD_SETSIZE);
+            close(origin_fd);
+            s->current_resolution = s->current_resolution->ai_next;
+            continue;
+        }
 
         logf(LOG_DEBUG, "[REQUEST] Created origin_fd=%d for client_fd=%d", origin_fd, key->fd);
 

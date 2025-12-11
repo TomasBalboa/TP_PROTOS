@@ -1,4 +1,5 @@
 #!/bin/bash
+#sed -i 's/\r$//' tools/testConections.sh && chmod +x tools/testConections.sh
 
 PROXY_USER="admin"
 PROXY_PASS="0000"

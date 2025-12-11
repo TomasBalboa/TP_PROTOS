@@ -188,6 +188,13 @@ socksv5_passive_accept(struct selector_key *key) {
         log(LOG_WARNING, "socksv5_passive_accept (socks5nio.c): accept() retornó -1");
         goto fail;
     }
+    
+    // Verific0 que el FD esté dentro del límite de select() (FD_SETSIZE = 1024)
+    if(client >= FD_SETSIZE) {
+        logf(LOG_WARNING, "socksv5_passive_accept (socks5nio.c): FD %d excede FD_SETSIZE (%d), rechazando conexión", client, FD_SETSIZE);
+        goto fail;
+    }
+    
     if(selector_fd_set_nio(client) == -1) {
         log(LOG_ERROR, "socksv5_passive_accept (socks5nio.c): falló selector_fd_set_nio");
         goto fail;
@@ -207,6 +214,13 @@ socksv5_passive_accept(struct selector_key *key) {
     selector_status ans = selector_register(key->s, client, &socks5_handler, OP_READ, state);
     if(SELECTOR_SUCCESS != ans) {
         logf(LOG_WARNING, "socksv5_passive_accept (socks5nio.c): selector_register falló (%s)", selector_error(ans));
+        
+        // Si llegamos al límite de FDs, temporalmente dejamos de aceptar nuevas conexiones
+        if(ans == SELECTOR_MAXFD) {
+            log(LOG_WARNING, "socksv5_passive_accept (socks5nio.c): límite de FDs alcanzado, pausando accept temporalmente");
+            selector_set_interest_key(key, OP_NOOP);  // Desactivar OP_READ en el listening socket
+        }
+        
         goto fail;
     }
     
