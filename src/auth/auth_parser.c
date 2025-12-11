@@ -9,8 +9,8 @@ void auth_parser_init(struct auth_parser *p) {
 }
 
 void auth_parser_close(struct auth_parser *p) {
-    // No dynamic resources to free in current implementation
-    (void)p; // suppress unused parameter warning
+   
+    (void)p; 
 }  
 
 

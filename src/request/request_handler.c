@@ -398,10 +398,6 @@ unsigned request_write(struct selector_key *key) {
             if(s->origin_fd < 0) {
                 ret = ERROR;
             } else {
-                /* La respuesta está enviada. El origin_fd ya está registrado con OP_WRITE
-                 * esperando que la conexión se complete. 
-                 * Desactivar interés en client_fd hasta que origin esté listo.
-                 */
                 selector_set_interest_key(key, OP_NOOP);
                 ret = REQUEST_CONNECTING;
             }

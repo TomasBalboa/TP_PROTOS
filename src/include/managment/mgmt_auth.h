@@ -13,19 +13,8 @@
  * ya que ambos protocolos siguen RFC 1929 con el mismo formato:
  * - Request: [VER:1][ULEN:1][USERNAME:N][PLEN:1][PASSWORD:M]
  * - Response: [VER:1][STATUS:1]
- * 
- * Implementa una máquina de estados no bloqueante que maneja:
- * - MANAGEMENT_AUTH_READ: Lee y parsea credenciales
- * - MANAGEMENT_AUTH_WRITE: Envía respuesta de autenticación
- * 
- * Estados definidos en managment.h:
- * - MANAGMENT_AUTH_READ
- * - MANAGMENT_AUTH_WRITE
- * - MANAGMENT_REQUEST_READ (estado siguiente tras auth exitosa)
- * - MANAGMENT_ERROR
  */
 
-// Forward declaration de la estructura del cliente de management
 struct mgmt_client_data;
 
 /**

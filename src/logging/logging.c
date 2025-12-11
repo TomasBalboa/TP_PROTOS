@@ -77,16 +77,14 @@ static inline void makeBufferSpace(size_t len) {
  * selector to notify us when writing is available and retry once that happens.
  */
 static inline void tryFlushBufferToFile(void) {
-    // Try to write everything we have in the buffer. This is nonblocking, so any
-    // (or all) remaining bytes will be saved in the buffer and retried later.
+
     ssize_t written = write(logFileFd, buffer + bufferStart, bufferLength);
     if (written > 0) {
         bufferLength -= written;
         bufferStart = (bufferLength == 0 ? 0 : (bufferStart + written));
     }
 
-    // If there are still remaining bytes to write, leave them in the buffer and retry
-    // once the selector says the fd can be written.
+
     selector_set_interest(selector, logFileFd, bufferLength > 0 ? OP_WRITE : OP_NOOP);
 }
 
@@ -97,11 +95,10 @@ static void fdWriteHandler(selector_key_t* key) {
 
 static void fdCloseHandler(selector_key_t* key) {
     (void) key;
-    // We will attempt to flush the remaining bytes to the log file and then close it.
+    
 
     if (bufferLength != 0) {
-        // Set the log file to blocking, then try to write the remaining bytes. If any of
-        // this fails, just ignore the failure.
+       
         int flags = fcntl(logFileFd, F_GETFD, 0);
         fcntl(logFileFd, F_SETFL, flags & (~O_NONBLOCK));
         ssize_t written = write(logFileFd, buffer, bufferLength);
@@ -130,18 +127,18 @@ static int tryOpenLogfile(const char* logFile, struct tm tm) {
 
     char logfilebuf[DEFAULT_LOG_FILE_MAXSTRLEN + 1];
 
-    // If logFile is "", then we use the default log file name instead.
+
     if (logFile[0] == '\0') {
         snprintf(logfilebuf, DEFAULT_LOG_FILE_MAXSTRLEN, DEFAULT_LOG_FILE, 
                  tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900,
                  tm.tm_hour, tm.tm_min);
         logFile = logfilebuf;
 
-        // If the default log folder isn't created, create it.
+    
         mkdir(DEFAULT_LOG_DIR, LOG_DIR_PERMISSION_BITS);
     }
 
-    // Warning: If a custom logFile is specified and it is within uncreated folders, this open will fail.
+
     int fd = open(logFile, LOG_FILE_OPEN_FLAGS, LOG_FILE_PERMISSION_BITS);
     if (fd < 0) {
         fprintf(stderr, "LOG_WARNING: Failed to open logging file at %s. The server will still run, but with logging disabled.\n", logFile);
@@ -152,7 +149,7 @@ static int tryOpenLogfile(const char* logFile, struct tm tm) {
 }
 
 int loggerInit(fd_selector selectorParam, const char* logFile, FILE* logStreamParam) {
-    // Get the local time (to log when the server started)
+
     time_t timeNow = time(NULL);
     struct tm tm = *localtime(&timeNow);
 
@@ -161,11 +158,11 @@ int loggerInit(fd_selector selectorParam, const char* logFile, FILE* logStreamPa
     logStream = logStreamParam;
     logLevel = MIN_LOG_LEVEL;
 
-    // If we opened a file for writing logs, register it in the selector.
+   
     if (logFileFd >= 0)
         selector_register(selector, logFileFd, &fdHandler, OP_NOOP, NULL);
 
-    // If we have any form of logging enabled, allocate a buffer for logging.
+   
     if (logFileFd >= 0 || logStream != NULL) {
         buffer = malloc(LOG_MIN_BUFFER_SIZE);
         bufferCapacity = LOG_MIN_BUFFER_SIZE;
@@ -183,13 +180,13 @@ int loggerInit(fd_selector selectorParam, const char* logFile, FILE* logStreamPa
 }
 
 int loggerFinalize(void) {
-    // If a logging file is opened, flush buffers, unregister it, and close it.
+   
     if (logFileFd >= 0) {
-        selector_unregister_fd(selector, logFileFd); // This will also call the TFdHandler's close, and close the file.
+        selector_unregister_fd(selector, logFileFd); 
         selector = NULL;
     }
 
-    // If we allocated a buffer, free it.
+
     if (buffer != NULL) {
         free(buffer);
         buffer = NULL;
@@ -198,7 +195,6 @@ int loggerFinalize(void) {
         bufferStart = 0;
     }
 
-    // The logger does not handle closing the stream. We set it to NULL and forget.
     logStream = NULL;
     return 0;
 }
@@ -220,9 +216,6 @@ void loggerGetBufstartAndMaxlength(char** bufstartVar, size_t* maxlenVar) {
     *bufstartVar = buffer + bufferStart + bufferLength;
 }
 
-/**
- * @brief Called by the logf macro to perform error checking and log flushing.
- */
 int loggerPostPrint(int written, size_t maxlen) {
     if (written < 0) {
         fprintf(stderr, "Error: snprintf(): %s\n", strerror(errno));
@@ -238,8 +231,6 @@ int loggerPostPrint(int written, size_t maxlen) {
         fprintf(logStream, "%s", buffer + bufferStart + bufferLength);
     }
 
-    // If there's no output file, then we printed the results to the stream but don't
-    // update bufferLength because we're not saving anything in the buffer.
     if (logFileFd >= 0) {
         bufferLength += written;
         tryFlushBufferToFile();

@@ -3,7 +3,7 @@
 
 #define MGMT_VERSION 1
 
-// Códigos de comando (deben coincidir con el servidor)
+// Códigos de comando
 typedef enum {
     MGMT_ADD_USER    = 0,
     MGMT_DELETE_USER = 1,
@@ -131,7 +131,7 @@ uint8_t recv_mgmt_response(int fd, char* response, size_t* response_len){
     return status;
 }
 
-/* Funciones auxiliares de alto nivel */
+/* Funciones auxiliares */
 
 int execute_simple_command(int fd, uint8_t cmd_code, const char* success_msg){
     if(!send_mgmt_command(fd, cmd_code, NULL, 0)){

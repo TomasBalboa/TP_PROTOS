@@ -36,15 +36,6 @@ void mgmt_auth_init(const unsigned state, struct selector_key *key) {
 /**
  * Handler de lectura para MANAGEMENT_AUTH_READ.
  * Lee y parsea las credenciales usando auth_parser (compartido con SOCKS5).
- * 
- * Flujo:
- * 1. recv() desde el socket
- * 2. Parsear con auth_consume()
- * 3. Si auth_is_done():
- *    - Validar con try_to_authenticate()
- *    - Construir respuesta con auth_marshall_response()
- *    - Cambiar a OP_WRITE
- *    - Return MANAGEMENT_AUTH_WRITE
  */
 unsigned mgmt_auth_read(struct selector_key *key) {
     mgmt_client *data = (mgmt_client *)key->data;
@@ -124,14 +115,6 @@ unsigned mgmt_auth_read(struct selector_key *key) {
 /**
  * Handler de escritura para MANAGEMENT_AUTH_WRITE.
  * Envía la respuesta de autenticación al cliente.
- * 
- * Flujo:
- * 1. send() respuesta al cliente
- * 2. Verificar que se envió todo
- * 3. Verificar que no hubo errores en el parser
- * 4. Verificar que el usuario está autenticado
- * 5. Cambiar a OP_READ
- * 6. Return MANAGEMENT_REQUEST_READ
  */
 unsigned mgmt_auth_write(struct selector_key *key) {
     mgmt_client *data = (mgmt_client *)key->data;

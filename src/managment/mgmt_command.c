@@ -135,7 +135,6 @@ unsigned mgmt_command_write(struct selector_key *key) {
     return MANAGMENT_CLOSED;
 }
 
-// ==== Implementación de handlers de comandos ====
 
 static bool mgmt_add_user_handler(mgmt_command_parser *parser,
                                   struct buffer *response_buffer) {
@@ -269,7 +268,6 @@ static bool mgmt_stats_handler(mgmt_command_parser *parser,
     return true;
 }
 
-// ==== Dispatcher ====
 
 static bool mgmt_process_command(mgmt_command_parser *parser,
                                  struct buffer *resp,

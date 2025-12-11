@@ -49,7 +49,7 @@ unsigned auth_read(struct selector_key *key) {
             }
         }
     } else if (n == 0) {
-        /* Peer performed orderly shutdown */
+       
         logf(LOG_WARNING, "[AUTH] auth_read fd=%d peer closed connection (recv=0)", key->fd);
         ret = ERROR;
     } else {
