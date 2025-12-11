@@ -90,7 +90,7 @@ test-run:
 # Limpiar
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
-	@echo "Todo limpio o7"
+	@echo "Todo limpio Agente 007"
 
 # Ayuda
 help:
