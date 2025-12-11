@@ -34,6 +34,8 @@ static bool mgmt_get_default_auth_handler(mgmt_command_parser *parser,
                                           struct buffer *response_buffer);
 static bool mgmt_user_activity_handler(mgmt_command_parser *parser,
                                        struct buffer *response_buffer);
+static bool mgmt_change_password_handler(mgmt_command_parser *parser,
+                                         struct buffer *response_buffer);
 
 // Tabla de handlers indexada por enum mgmt_command
 static mgmt_command_handler command_handlers[] = {
@@ -45,6 +47,7 @@ static mgmt_command_handler command_handlers[] = {
     mgmt_set_default_auth_handler,  // MGMT_SET_DEFAULT_AUTH_METHOD
     mgmt_get_default_auth_handler,  // MGMT_GET_DEFAULT_AUTH_METHOD
     mgmt_user_activity_handler,     // MGMT_USER_ACTIVITY
+    mgmt_change_password_handler,   // MGMT_CHANGE_PASSWORD
 };
 
 // Qué comandos requieren privilegios de admin
@@ -57,6 +60,7 @@ static bool needs_admin_privileges[] = {
     true,  // MGMT_SET_DEFAULT_AUTH_METHOD
     true,  // MGMT_GET_DEFAULT_AUTH_METHOD
     true,  // MGMT_USER_ACTIVITY
+    true,  // MGMT_CHANGE_PASSWORD
 };
 
 void mgmt_command_read_init(const unsigned state, struct selector_key *key) {
@@ -458,6 +462,33 @@ static bool mgmt_user_activity_handler(mgmt_command_parser *parser,
     return true;
 }
 
+static bool mgmt_change_password_handler(mgmt_command_parser *parser,
+                                         struct buffer *response_buffer) {
+    if (parser->args_count != 2) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_INVALID_ARGS,
+                                                  "change_password: expected 2 args");
+    }
+
+    const char *username = (const char *)parser->args[0];
+    const char *new_password = (const char *)parser->args[1];
+
+    if (!exists_user(username)) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_INVALID_ARGS,
+                                                  "change_password: user not found");
+    }
+
+    if (!users_change_password(username, new_password)) {
+        return mgmt_command_parser_build_response(parser, response_buffer,
+                                                  MGMT_STATUS_SERVER_ERROR,
+                                                  "change_password: failed");
+    }
+
+    return mgmt_command_parser_build_response(parser, response_buffer,
+                                              MGMT_STATUS_OK,
+                                              "change_password: password changed");
+}
 
 
 

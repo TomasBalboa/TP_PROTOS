@@ -107,6 +107,14 @@ size_t users_dump_usernames(uint8_t *dst, size_t dst_len);
  */
 bool users_change_role(const char *username, bool is_admin);
 
+/**
+ * Cambia la contraseña de un usuario existente.
+ * @param username nombre de usuario
+ * @param new_password nueva contraseña
+ * @return true si se cambió, false si el usuario no existe o contraseña inválida.
+ */
+bool users_change_password(const char *username, const char *new_password);
+
 void users_add_access_log(const char *username, const char *ip_or_site);
 
 size_t get_user_access_history(const char *username,

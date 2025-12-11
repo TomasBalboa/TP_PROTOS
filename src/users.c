@@ -206,6 +206,21 @@ bool users_change_role(const char *username, bool is_admin) {
     return true;
 }
 
+bool users_change_password(const char *username, const char *new_password) {
+    int user_idx = find_user(username);
+    if (user_idx == -1) {
+        return false;  // no existe
+    }
+
+    if (!validate_length(new_password)) {
+        return false;  // contraseña vacía o muy larga
+    }
+
+    strncpy(users[user_idx].pass, new_password, MAX_PASSWORD_LENGTH);
+    users[user_idx].pass[MAX_PASSWORD_LENGTH] = '\0';
+    return true;
+}
+
 void users_add_access_log(const char *username, const char *ip_or_site) {
     int user_idx = find_user(username);
     if (user_idx == -1 || ip_or_site == NULL) {

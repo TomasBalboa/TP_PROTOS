@@ -40,10 +40,9 @@ int cmd_add_user(int socket, int two, char** args){
 }
 
 int cmd_change_pwd(int socket, int two, char** args){
-    (void) two; (void) socket; (void) args;
-    
-    printf("-ERR: command not implemented on server\n");
-    return 0;
+    (void) two;
+    const char* cmd_args[2] = {args[0], args[1]};
+    return execute_command_with_args(socket, 8, cmd_args, 2, "password changed");
 }
 
 int cmd_delete_user(int socket, int one, char** user){

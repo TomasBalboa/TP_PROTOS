@@ -21,6 +21,7 @@ typedef enum {
     MGMT_SET_DEFAULT_AUTH_METHOD,
     MGMT_GET_DEFAULT_AUTH_METHOD,
     MGMT_USER_ACTIVITY,
+    MGMT_CHANGE_PASSWORD,
 } mgmt_command;
 
 typedef enum {

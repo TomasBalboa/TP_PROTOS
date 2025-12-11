@@ -59,6 +59,15 @@ main(const int argc, char **argv) {
     metricsInit();
     users_init();  // Inicializar sistema de usuarios
 
+    // Crear usuarios especificados por línea de comandos con -u
+    for(int i = 0; i < MAX_USERS && args.users[i].name != NULL; i++) {
+        if(create_user(args.users[i].name, args.users[i].pass, false)) {
+            logf(LOG_OUTPUT, "Usuario añadido: %s", args.users[i].name);
+        } else {
+            logf(LOG_WARNING, "No se pudo añadir usuario: %s (puede que ya exista)", args.users[i].name);
+        }
+    }
+
     // no tenemos nada que leer de stdin
     close(0);
 
@@ -194,6 +203,12 @@ main(const int argc, char **argv) {
     
     logf(LOG_OUTPUT, "Management server listening on %s:%d", args.mng_addr, args.mng_port);
     logf(LOG_OUTPUT, "Default admin user: %s / %s", DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD);
+    
+    // usuarios adicionales que creo con -u 
+    size_t total_users = users_get_count();
+    if(total_users > 1) {
+        logf(LOG_OUTPUT, "Additional users created: %zu", total_users - 1);
+    }
     // ===== END MANAGEMENT SOCKET =====
     
     for(;!done;) {
