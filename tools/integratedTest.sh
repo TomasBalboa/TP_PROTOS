@@ -3,8 +3,8 @@
 sed -i 's/\r$//' tools/integratedTest.sh && chmod +x tools/integratedTest.sh
 # ================= CONFIG =================
 
-CONNECTIONS=500           # Total de conexiones a lanzar
-CONCURRENCY=100           # Número de conexiones concurrentes máximas
+CONNECTIONS=3000           # Total de conexiones a lanzar
+CONCURRENCY=500           # Número de conexiones concurrentes máximas
 SERVER="127.0.0.1"        # Dirección del proxy
 PORT="1080"               # Puerto del proxy SOCKS5 (sin auth)
 
@@ -17,7 +17,7 @@ URLS=(
   "https://www.kernel.org"
   "https://www.mozilla.org"
   "https://www.github.com"
-  "https://www.reddit.com"
+  "https://nbg1-speed.hetzner.com/100MB.bin"
   "https://www.stackoverflow.com"
 )
 
