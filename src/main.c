@@ -98,7 +98,11 @@ main(const int argc, char **argv) {
     }
 
     loggerInit(selector,"",stdout);
-    loggerSetLevel(LOG_DEBUG);
+#ifdef DEBUG_MODE
+    loggerSetLevel(LOG_DEBUG);  // Modo debug activado
+#else
+    loggerSetLevel(LOG_INFO);   // Modo producción
+#endif
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
