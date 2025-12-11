@@ -4,12 +4,12 @@ sed -i 's/\r$//' tools/integratedTest.sh && chmod +x tools/integratedTest.sh
 # ================= CONFIG =================
 
 CONNECTIONS=3000           # Total de conexiones a lanzar
-CONCURRENCY=500           # Número de conexiones concurrentes máximas
+CONCURRENCY=300           # Número de conexiones concurrentes máximas
 SERVER="127.0.0.1"        # Dirección del proxy
 PORT="1080"               # Puerto del proxy SOCKS5 (sin auth)
 
 URLS=(
-  "https://example.com"
+  "https://example.org"
   "https://www.google.com"
   "https://www.cloudflare.com"
   "https://www.gnu.org"
